@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+cache.db
+archive/
+.user_uploaded/
+anki_decks/*.jpg

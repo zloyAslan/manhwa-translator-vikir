@@ -1,0 +1,11 @@
+PyQt6>=6.6.0
+requests>=2.31.0
+keyboard>=0.13.5
+pyperclip>=1.8.2
+pywin32>=306
+pillow>=10.0.0
+genanki>=0.13.0
+rapidocr_onnxruntime>=1.2.3
+onnxruntime>=1.17.0
+numpy>=1.24.0
+opencv-python>=4.5.0

@@ -1,0 +1,16 @@
+{
+  "pos_x": 64,
+  "pos_y": 113,
+  "mascot_style": "sticker",
+  "mascot_size": 95,
+  "bubble_opacity": 0.98,
+  "mascot_opacity": 1.0,
+  "pinned": false,
+  "hotkey": "alt+q",
+  "auto_paste_clipboard": true,
+  "play_sound": false,
+  "theme": "comic_light",
+  "gemini_api_key": "AQ.Ab8RN6JameZCI5KID03P781w8vgYtkJDi-5VMfBCOuI5zq7o6g",
+  "window_width": 710,
+  "window_height": 377
+}
