@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manhwa Reader AI Drafter — Quick Guide / Інструкція</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090b10;
+      --card-bg: rgba(18, 22, 34, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #fbbf24;
+      --accent-grad: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+      --mint-border: rgba(45, 212, 191, 0.35);
+      --mint-bg: rgba(10, 26, 24, 0.85);
+      --red-border: rgba(239, 68, 68, 0.35);
+      --red-bg: rgba(35, 12, 14, 0.85);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      padding: 30px 20px 80px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(251, 191, 36, 0.07) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(59, 130, 246, 0.06) 0%, transparent 45%);
+      min-height: 100vh;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    /* Top Language Switcher Bar */
+    .lang-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .lang-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font);
+    }
+    .lang-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+    .lang-btn.active {
+      background: var(--accent-grad);
+      color: #110d04;
+      border-color: transparent;
+      box-shadow: 0 2px 10px rgba(251, 191, 36, 0.35);
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+      padding: 32px 24px;
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #fbbf24, #3b82f6, #10b981);
+    }
+    .badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+    h1 { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+    h1 span { background: var(--accent-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--text-muted); font-size: 1rem; max-width: 650px; margin: 0 auto; }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(13, 16, 26, 0.85);
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 22px;
+    }
+    .tab-btn {
+      flex: 1 1 120px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-radius: 9px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: #110d04;
+      background: var(--accent-grad);
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
+    }
+
+    /* Tab Panes */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+    .tab-pane.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Steps */
+    .step-item {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .step-num {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--accent-grad);
+      color: #110d04;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+    .step-content { flex: 1; }
+    .step-content h3 { font-size: 1.05rem; margin-bottom: 4px; color: #fff; }
+    .step-content p { color: var(--text-muted); font-size: 0.92rem; }
+
+    /* Code & keys */
+    code {
+      font-family: var(--mono);
+      background: rgba(0, 0, 0, 0.45);
+      padding: 3px 7px;
+      border-radius: 6px;
+      color: #fbbf24;
+      font-size: 0.88em;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .kbd {
+      display: inline-block;
+      padding: 2px 7px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #f3f4f6;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+    }
+
+    /* Alerts */
+    .alert {
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 14px 0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 0.92rem;
+    }
+    .alert-info { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; }
+    .alert-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fde68a; }
+    .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #a7f3d0; }
+
+    /* Grids */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 16px 0; }
+    .grid-item {
+      background: rgba(13, 16, 26, 0.65);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .grid-item h4 { font-size: 0.98rem; margin-bottom: 6px; color: #fff; }
+    .grid-item p { font-size: 0.88rem; color: var(--text-muted); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.92rem; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+    th { color: #9ca3af; font-weight: 700; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.05em; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    /* Mint Card (Security) */
+    .card-security {
+      border: 1px solid var(--mint-border);
+      background: var(--mint-bg);
+      box-shadow: 0 8px 30px rgba(13, 148, 136, 0.12);
+    }
+    .badge-mint {
+      background: rgba(45, 212, 191, 0.15);
+      color: #2dd4bf;
+      border: 1px solid rgba(45, 212, 191, 0.35);
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Language Selector -->
+  <div class="lang-bar">
+    <button class="lang-btn active" onclick="setLang('en')">English</button>
+    <button class="lang-btn" onclick="setLang('uk')">Українська</button>
+    <button class="lang-btn" onclick="setLang('ru')">Русский</button>
+  </div>
+
+  <header>
+    <div class="badge" id="hdr-badge">🚀 Standalone Webtoon Reader & Downloader</div>
+    <h1 id="hdr-title">Manhwa Reader <span>AI Drafter</span></h1>
+    <p class="subtitle" id="hdr-subtitle">Modern standalone player for Webtoons & Mangas. High-speed Telegram downloader, automatic bookmark sync, zero lag.</p>
+  </header>
+
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="openTab('start')" id="tab-btn-start">⚡ Quick Start</button>
+    <button class="tab-btn" onclick="openTab('tg')" id="tab-btn-tg">🤖 Telegram Bot</button>
+    <button class="tab-btn" onclick="openTab('hotkeys')" id="tab-btn-hotkeys">⌨️ Controls</button>
+    <button class="tab-btn" onclick="openTab('security')" id="tab-btn-security">🛡️ Files & Portable</button>
+  </nav>
+
+  <!-- TAB: START -->
+  <div id="tab-start" class="tab-pane active">
+    <div class="card">
+      <div class="card-title" id="start-title">⚡ Quick Start in 3 Easy Steps</div>
+      
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3 id="step1-h">Unpack & Run</h3>
+          <p id="step1-p">Extract the folder anywhere on your PC (Desktop, disk D:, USB drive). Run <code>ManhwaReader.exe</code> or execute <code>python reader.py</code>. The <code>library</code> folder will be created automatically.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3 id="step2-h">Connect Telegram Bot (Optional, for downloading)</h3>
+          <p id="step2-p">Open the <b>«⚡ TG Downloader»</b> tab. Click <b>«🤖 Bot Token»</b>, paste your bot token from <a href="https://t.me/BotFather" target="_blank" style="color:#60a5fa;">@BotFather</a> and save. No phone numbers, SMS, or passwords needed!</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3 id="step3-h">Download & Enjoy Reading</h3>
+          <p id="step3-p">Enter an open Telegram channel (e.g. <code>@Manhwa_Weebs</code> or link) ➔ enter chapter number (e.g. <code>1</code> or <code>1-10</code>) ➔ click <b>«🚀 Start Download»</b>. Chapters appear instantly in your library!</p>
+        </div>
+      </div>
+
+      <div class="alert alert-success" id="start-alert">
+        <span>🎉 <b>Dual Reading Mode:</b> Read directly from high-resolution PDF or unpack to lightning-fast JPEG strips anytime via the button in the reader header!</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: TELEGRAM BOT -->
+  <div id="tab-tg" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="tg-title">🤖 Free Telegram Bot Setup (1 Minute)</div>
+      
+      <p style="color:var(--text-muted); margin-bottom:16px;" id="tg-intro">
+        Our downloader uses the official Telegram Bot API to download PDF manhwa chapters from open channels. It requires zero phone logins and is 100% secure.
+      </p>
+
+      <ol style="margin-left: 20px; color:#d1d5db; margin-bottom:20px; font-size:0.94rem; line-height:1.7;">
+        <li id="tg-step-1">Open <a href="https://t.me/BotFather" target="_blank" style="color:#60a5fa;">@BotFather</a> in Telegram.</li>
+        <li id="tg-step-2">Send the command <code>/newbot</code>.</li>
+        <li id="tg-step-3">Enter any display name for your bot (e.g. <i>MyReaderBot</i>).</li>
+        <li id="tg-step-4">Enter a unique username ending with <code>bot</code> (e.g. <i>my_reader_super_bot</i>).</li>
+        <li id="tg-step-5">Copy the received HTTP API token (format: <code>8599785351:AAFNZkDk1Gl...</code>).</li>
+        <li id="tg-step-6">In Manhwa Reader ➔ open <b>«⚡ TG Downloader»</b> ➔ click <b>«🤖 Bot Token»</b> ➔ paste and click <b>Save</b>!</li>
+      </ol>
+
+      <div class="grid">
+        <div class="grid-item">
+          <h4 id="grid-tg-ch-h">📢 Supported Channels</h4>
+          <p id="grid-tg-ch-p">Any public channel with PDF chapters. E.g. <code>@manhwa047</code>, <code>@Manhwa_Weebs</code> or links like <code>https://t.me/channel_name</code>.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="grid-tg-filter-h">🔢 Range Filters</h4>
+          <p id="grid-tg-filter-p">Download single chapters <code>5</code>, ranges <code>1-30</code>, or multiple numbers <code>1 2 5</code>. Empty field downloads all found chapters.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: CONTROLS & HOTKEYS -->
+  <div id="tab-hotkeys" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="hotkeys-title">⌨️ Keyboard & Navigation Controls</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th id="th-key">Key / Action</th>
+            <th id="th-function">Function</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="kbd">Down</span> / <span class="kbd">S</span></td>
+            <td id="row-scroll-down">Smooth scroll down (speed configurable in Settings)</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Up</span> / <span class="kbd">W</span></td>
+            <td id="row-scroll-up">Smooth scroll up</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Space</span> / <span class="kbd">PageDown</span></td>
+            <td id="row-page-down">Scroll down by one screen height</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">PageUp</span></td>
+            <td id="row-page-up">Scroll up by one screen height</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">H</span></td>
+            <td id="row-zen"><b>Zen Mode:</b> Hide/Show top navigation bar for immersive reading</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">F11</span></td>
+            <td id="row-fs">Toggle Fullscreen mode</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="alert alert-info" id="hotkeys-alert">
+        <span>💡 <b>Auto-bookmarking:</b> The reader automatically saves your exact scroll position and chapter for every title in your library.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: FILES & PORTABLE -->
+  <div id="tab-security" class="tab-pane">
+    <div class="card card-security">
+      <div class="card-title" style="color: #2dd4bf; margin-bottom: 8px;">
+        <span class="badge-mint" id="port-badge">🛡️ PORTABLE & CLEAN ARCHITECTURE</span>
+      </div>
+      <h2 style="font-size: 1.35rem; color: #f0fdfa; margin-bottom: 12px; font-weight: 800;" id="port-h">Everything you need in a portable ZIP</h2>
+      <p style="color: #99f6e4; margin-bottom: 18px; font-size: 0.94rem;" id="port-p">
+        The application is 100% portable. You can move the folder between drives or PCs without breaking your library or bookmarks.
+      </p>
+
+      <h3 style="color: #2dd4bf; margin: 18px 0 10px; font-size: 1.05rem;" id="port-list-h">📁 Essential files inside the folder:</h3>
+      <table style="border: 1px solid rgba(45, 212, 191, 0.25); border-radius: 12px; background: rgba(10, 26, 24, 0.5);">
+        <thead>
+          <tr style="background: rgba(45, 212, 191, 0.15);">
+            <th style="color: #5eead4;">File / Folder</th>
+            <th style="color: #5eead4;">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code style="color:#5eead4;">reader.py</code></td>
+            <td style="color:#ccfbf1;" id="row-f-reader">Main reader window, Webtoon scroll canvas, and settings.</td>
+          </tr>
+          <tr>
+            <td><code style="color:#5eead4;">downloader.py</code></td>
+            <td style="color:#ccfbf1;" id="row-f-dl">Telegram downloader engine and PDF-to-JPEG converter.</td>
+          </tr>
+          <tr>
+            <td><code style="color:#5eead4;">config.json</code></td>
+            <td style="color:#ccfbf1;" id="row-f-cfg">App preferences (scroll speed, language, theme, bookmarks).</td>
+          </tr>
+          <tr>
+            <td><code style="color:#5eead4;">icon.png</code> / <code style="color:#5eead4;">icon.ico</code></td>
+            <td style="color:#ccfbf1;" id="row-f-icon">Application visual assets and icon.</td>
+          </tr>
+          <tr>
+            <td><code style="color:#5eead4;">library/</code></td>
+            <td style="color:#ccfbf1;" id="row-f-lib">Your downloaded manhwa titles. Auto-created if missing!</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <p id="footer-text">Manhwa Reader AI Drafter • Standalone Webtoon Engine • 2026</p>
+  </footer>
+</div>
+
+<script>
+  const i18n = {
+    en: {
+      hdrBadge: "🚀 Standalone Webtoon Reader & Downloader",
+      hdrTitle: "Manhwa Reader <span>AI Drafter</span>",
+      hdrSub: "Modern standalone player for Webtoons & Mangas. High-speed Telegram downloader, automatic bookmark sync, zero lag.",
+      tabStart: "⚡ Quick Start",
+      tabTg: "🤖 Telegram Bot",
+      tabHotkeys: "⌨️ Controls",
+      tabSecurity: "🛡️ Files & Portable",
+      startTitle: "⚡ Quick Start in 3 Easy Steps",
+      step1H: "Unpack & Run",
+      step1P: "Extract the folder anywhere on your PC (Desktop, disk D:, USB drive). Run ManhwaReader.exe or execute python reader.py. The library folder will be created automatically.",
+      step2H: "Connect Telegram Bot (Optional, for downloading)",
+      step2P: "Open the «⚡ TG Downloader» tab. Click «🤖 Bot Token», paste your bot token from @BotFather and save. No phone numbers, SMS, or passwords needed!",
+      step3H: "Download & Enjoy Reading",
+      step3P: "Enter an open Telegram channel (e.g. @Manhwa_Weebs or link) ➔ enter chapter number (e.g. 1 or 1-10) ➔ click «🚀 Start Download». Chapters appear instantly in your library!",
+      startAlert: "🎉 <b>Dual Reading Mode:</b> Read directly from high-resolution PDF or unpack to lightning-fast JPEG strips anytime via the button in the reader header!",
+      tgTitle: "🤖 Free Telegram Bot Setup (1 Minute)",
+      tgIntro: "Our downloader uses the official Telegram Bot API to download PDF manhwa chapters from open channels. It requires zero phone logins and is 100% secure.",
+      tgStep1: "Open @BotFather in Telegram.",
+      tgStep2: "Send the command /newbot.",
+      tgStep3: "Enter any display name for your bot (e.g. MyReaderBot).",
+      tgStep4: "Enter a unique username ending with bot (e.g. my_reader_super_bot).",
+      tgStep5: "Copy the received HTTP API token (format: 8599785351:AAFNZkDk1Gl...).",
+      tgStep6: "In Manhwa Reader ➔ open «⚡ TG Downloader» ➔ click «🤖 Bot Token» ➔ paste and click Save!",
+      gridTgChH: "📢 Supported Channels",
+      gridTgChP: "Any public channel with PDF chapters. E.g. @manhwa047, @Manhwa_Weebs or links like https://t.me/channel_name.",
+      gridTgFilterH: "🔢 Range Filters",
+      gridTgFilterP: "Download single chapters 5, ranges 1-30, or multiple numbers 1 2 5. Empty field downloads all found chapters.",
+      hotkeysTitle: "⌨️ Keyboard & Navigation Controls",
+      thKey: "Key / Action",
+      thFunc: "Function",
+      rowScrollDown: "Smooth scroll down (speed configurable in Settings)",
+      rowScrollUp: "Smooth scroll up",
+      rowPageDown: "Scroll down by one screen height",
+      rowPageUp: "Scroll up by one screen height",
+      rowZen: "Zen Mode: Hide/Show top navigation bar for immersive reading",
+      rowFs: "Toggle Fullscreen mode",
+      hotkeysAlert: "💡 <b>Auto-bookmarking:</b> The reader automatically saves your exact scroll position and chapter for every title in your library.",
+      portBadge: "🛡️ PORTABLE & CLEAN ARCHITECTURE",
+      portH: "Everything you need in a portable ZIP",
+      portP: "The application is 100% portable. You can move the folder between drives or PCs without breaking your library or bookmarks.",
+      portListH: "📁 Essential files inside the folder:",
+      rowFReader: "Main reader window, Webtoon scroll canvas, and settings.",
+      rowFDl: "Telegram downloader engine and PDF-to-JPEG converter.",
+      rowFCfg: "App preferences (scroll speed, language, theme, bookmarks).",
+      rowFIcon: "Application visual assets and icon.",
+      rowFLib: "Your downloaded manhwa titles. Auto-created if missing!",
+      footer: "Manhwa Reader AI Drafter • Standalone Webtoon Engine • 2026"
+    },
+    uk: {
+      hdrBadge: "🚀 Автономний Вебтун-плеєр та TG Завантажувач",
+      hdrTitle: "Manhwa Reader <span>AI Drafter</span>",
+      hdrSub: "Сучасний автономний вебтун-плеєр для манхви та манґи. Швидкий завантажувач із Telegram, автозакладки, плавний скрол без підвисань.",
+      tabStart: "⚡ Швидкий старт",
+      tabTg: "🤖 Telegram Бот",
+      tabHotkeys: "⌨️ Керування",
+      tabSecurity: "🛡️ Файли та перенесення",
+      startTitle: "⚡ Швидкий старт за 3 простих кроки",
+      step1H: "Розархівуйте та запустіть",
+      step1P: "Розпакуйте папку в будь-яке місце на ПК (Робочий стіл, диск D:, флешка). Запустіть ManhwaReader.exe або python reader.py. Папка library створиться автоматично.",
+      step2H: "Підключіть Telegram Бота (для скачування)",
+      step2P: "Відкрийте вкладку «⚡ TG Завантажувач». Натисніть «🤖 Токен Бота», вставте токен з @BotFather та збережіть. Жодних телефонів, SMS чи паролів 2FA!",
+      step3H: "Завантажуйте та читайте",
+      step3P: "Введіть відкритий Telegram-канал (напр. @Manhwa_Weebs або посилання) ➔ номер глави (напр. 1 або 1-10) ➔ натисніть «🚀 Почати завантаження». Глави миттєво з'являться у бібліотеці!",
+      startAlert: "🎉 <b>Подвійний режим читання:</b> Читайте напряму з якісного PDF або розпакуйте у надшвидку стрічку JPEG у будь-який момент прямо в читалці!",
+      tgTitle: "🤖 Налаштування безкоштовного Telegram Бота (1 хвилина)",
+      tgIntro: "Наш завантажувач використовує офіційний Telegram Bot API для скачування PDF-глав із відкритих каналів. Без логінів за телефоном, на 100% безпечно.",
+      tgStep1: "Відкрийте @BotFather у Telegram.",
+      tgStep2: "Надішліть команду /newbot.",
+      tgStep3: "Введіть будь-яке відображуване ім'я для бота (напр. MyReaderBot).",
+      tgStep4: "Введіть унікальний юзернейм, що закінчується на bot (напр. my_reader_super_bot).",
+      tgStep5: "Скопіюйте отриманий HTTP API токен (формат: 8599785351:AAFNZkDk1Gl...).",
+      tgStep6: "У програмі Manhwa Reader ➔ вкладка «⚡ TG Завантажувач» ➔ кнопка «🤖 Токен Бота» ➔ вставте та натисніть Зберегти!",
+      gridTgChH: "📢 Підтримувані канали",
+      gridTgChP: "Будь-який відкритий канал із PDF-документами. Наприклад: @manhwa047, @Manhwa_Weebs або повні лінки https://t.me/channel_name.",
+      gridTgFilterH: "🔢 Фільтри діапазонів",
+      gridTgFilterP: "Завантажуйте поодинокі глави 5, діапазони 1-30, або окремі номери через пробіл 1 2 5. Порожнє поле завантажить усі знайдені глави.",
+      hotkeysTitle: "⌨️ Керування клавіатурою та навігація",
+      thKey: "Клавіша / Дія",
+      thFunc: "Функція",
+      rowScrollDown: "Плавний скрол вниз (швидкість налаштовується в Налаштуваннях)",
+      rowScrollUp: "Плавний скрол вгору",
+      rowPageDown: "Скрол вниз на висоту одного екрана",
+      rowPageUp: "Скрол вгору на висоту одного екрана",
+      rowZen: "Zen Mode: Приховати/Показати верхнє меню для повного занурення",
+      rowFs: "Увімкнути/Вимкнути повноекранний режим",
+      hotkeysAlert: "💡 <b>Автоматичні закладки:</b> Читалка сама зберігає точний прогрес та місце скролу для кожної манхви у вашій бібліотеці.",
+      portBadge: "🛡️ ПОРТАТИВНІСТЬ ТА ЧИСТА АРХІТЕКТУРА",
+      portH: "Усе необхідне в зручному архіві",
+      portP: "Програма повністю портативна. Папку можна переносити між дисками чи комп'ютерами — бібліотека та закладки не втратяться.",
+      portListH: "📁 Важливі файли у папці:",
+      rowFReader: "Головний віконний інтерфейс читалки, вебтун-полотно та налаштування.",
+      rowFDl: "Модуль завантажувача з Telegram та конвертер PDF у JPEG.",
+      rowFCfg: "Файл конфігурації (швидкість скролу, мова, кольори, закладки).",
+      rowFIcon: "Графічні ресурси та іконка програми.",
+      rowFLib: "Папка бібліотеки манхви. Створюється сама, якщо її немає!",
+      footer: "Manhwa Reader AI Drafter • Standalone Webtoon Engine • 2026"
+    },
+    ru: {
+      hdrBadge: "🚀 Автономный Вебтун-плеер и TG Загрузчик",
+      hdrTitle: "Manhwa Reader <span>AI Drafter</span>",
+      hdrSub: "Современный плеер вебтунов для манхвы и манги. Быстрый загрузчик из Telegram, автозакладки, плавный скролл без зависаний.",
+      tabStart: "⚡ Быстрый старт",
+      tabTg: "🤖 Telegram Бот",
+      tabHotkeys: "⌨️ Управление",
+      tabSecurity: "🛡️ Файлы и перенос",
+      startTitle: "⚡ Быстрый старт за 3 простых шага",
+      step1H: "Распакуйте и запустите",
+      step1P: "Распакуйте папку в любое место на ПК (Рабочий стол, диск D:, флешка). Запустите ManhwaReader.exe или python reader.py. Папка library создастся автоматически.",
+      step2H: "Подключите Telegram Бота (для скачивания)",
+      step2P: "Откройте вкладку «⚡ TG Загрузчик». Нажмите «🤖 Токен Бота», вставьте токен из @BotFather и сохраните. Никаких телефонов, SMS или паролей 2FA!",
+      step3H: "Скачивайте и читайте",
+      step3P: "Введите открытый Telegram-канал (напр. @Manhwa_Weebs или ссылку) ➔ номер главы (напр. 1 или 1-10) ➔ нажмите «🚀 Начать загрузку». Главы сразу появятся в библиотеке!",
+      startAlert: "🎉 <b>Двойной режим чтения:</b> Читайте напрямую из качественного PDF или распакуйте в сверхбыструю ленту JPEG в любой момент прямо в читалке!",
+      tgTitle: "🤖 Настройка бесплатного Telegram Бота (1 минута)",
+      tgIntro: "Наш загрузчик использует официальный Telegram Bot API для скачивания PDF-глав из открытых каналов. Без входа по номеру, на 100% безопасно.",
+      tgStep1: "Откройте @BotFather в Telegram.",
+      tgStep2: "Отправьте команду /newbot.",
+      tgStep3: "Введите любое отображаемое имя для бота (напр. MyReaderBot).",
+      tgStep4: "Введите уникальный юзернейм, заканчивающийся на bot (напр. my_reader_super_bot).",
+      tgStep5: "Скопируйте полученный HTTP API токен (формат: 8599785351:AAFNZkDk1Gl...).",
+      tgStep6: "В программе Manhwa Reader ➔ вкладка «⚡ TG Загрузчик» ➔ кнопка «🤖 Токен Бота» ➔ вставьте и нажмите Сохранить!",
+      gridTgChH: "📢 Поддерживаемые каналы",
+      gridTgChP: "Любой открытый канал с PDF-документами. Например: @manhwa047, @Manhwa_Weebs или полные ссылки https://t.me/channel_name.",
+      gridTgFilterH: "🔢 Фильтры диапазонов",
+      gridTgFilterP: "Скачивайте отдельные главы 5, диапазоны 1-30, или номера через пробел 1 2 5. Пустое поле скачает все найденные главы.",
+      hotkeysTitle: "⌨️ Управление клавиатурой и навигация",
+      thKey: "Клавиша / Действие",
+      thFunc: "Функция",
+      rowScrollDown: "Плавный скролл вниз (скорость регулируется в Настройках)",
+      rowScrollUp: "Плавный скролл вверх",
+      rowPageDown: "Скролл вниз на высоту одного экрана",
+      rowPageUp: "Скролл вверх на высоту одного экрана",
+      rowZen: "Zen Mode: Скрыть/Показать верхнее меню для полного погружения",
+      rowFs: "Включить/Выключить полноэкранный режим",
+      hotkeysAlert: "💡 <b>Автоматические закладки:</b> Читалка сама сохраняет точный прогресс и место скролла для каждой манхвы в вашей библиотеке.",
+      portBadge: "🛡️ ПОРТАТИВНОСТЬ И ЧИСТАЯ АРХИТЕКТУРА",
+      portH: "Всё необходимое в удобном архиве",
+      portP: "Программа полностью портативна. Папку можно переносить между дисками или ПК — библиотека и закладки не потеряются.",
+      portListH: "📁 Важные файлы в папке:",
+      rowFReader: "Главный интерфейс читалки, полотно вебтуна и настройки.",
+      rowFDl: "Модуль загрузчика из Telegram и конвертер PDF в JPEG.",
+      rowFCfg: "Файл конфигурации (скорость скролла, язык, цвета, закладки).",
+      rowFIcon: "Графические ресурсы и иконка программы.",
+      rowFLib: "Папка библиотеки манхвы. Создается сама, если её нет!",
+      footer: "Manhwa Reader AI Drafter • Standalone Webtoon Engine • 2026"
+    }
+  };
+
+  function setLang(lang) {
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    const d = i18n[lang];
+    if (!d) return;
+
+    document.getElementById('hdr-badge').innerHTML = d.hdrBadge;
+    document.getElementById('hdr-title').innerHTML = d.hdrTitle;
+    document.getElementById('hdr-subtitle').innerText = d.hdrSub;
+
+    document.getElementById('tab-btn-start').innerText = d.tabStart;
+    document.getElementById('tab-btn-tg').innerText = d.tabTg;
+    document.getElementById('tab-btn-hotkeys').innerText = d.tabHotkeys;
+    document.getElementById('tab-btn-security').innerText = d.tabSecurity;
+
+    document.getElementById('start-title').innerText = d.startTitle;
+    document.getElementById('step1-h').innerText = d.step1H;
+    document.getElementById('step1-p').innerText = d.step1P;
+    document.getElementById('step2-h').innerText = d.step2H;
+    document.getElementById('step2-p').innerText = d.step2P;
+    document.getElementById('step3-h').innerText = d.step3H;
+    document.getElementById('step3-p').innerText = d.step3P;
+    document.getElementById('start-alert').innerHTML = d.startAlert;
+
+    document.getElementById('tg-title').innerText = d.tgTitle;
+    document.getElementById('tg-intro').innerText = d.tgIntro;
+    document.getElementById('tg-step-1').innerText = d.tgStep1;
+    document.getElementById('tg-step-2').innerText = d.tgStep2;
+    document.getElementById('tg-step-3').innerText = d.tgStep3;
+    document.getElementById('tg-step-4').innerText = d.tgStep4;
+    document.getElementById('tg-step-5').innerText = d.tgStep5;
+    document.getElementById('tg-step-6').innerText = d.tgStep6;
+    document.getElementById('grid-tg-ch-h').innerText = d.gridTgChH;
+    document.getElementById('grid-tg-ch-p').innerText = d.gridTgChP;
+    document.getElementById('grid-tg-filter-h').innerText = d.gridTgFilterH;
+    document.getElementById('grid-tg-filter-p').innerText = d.gridTgFilterP;
+
+    document.getElementById('hotkeys-title').innerText = d.hotkeysTitle;
+    document.getElementById('th-key').innerText = d.thKey;
+    document.getElementById('th-function').innerText = d.thFunc;
+    document.getElementById('row-scroll-down').innerText = d.rowScrollDown;
+    document.getElementById('row-scroll-up').innerText = d.rowScrollUp;
+    document.getElementById('row-page-down').innerText = d.rowPageDown;
+    document.getElementById('row-page-up').innerText = d.rowPageUp;
+    document.getElementById('row-zen').innerText = d.rowZen;
+    document.getElementById('row-fs').innerText = d.rowFs;
+    document.getElementById('hotkeys-alert').innerHTML = d.hotkeysAlert;
+
+    document.getElementById('port-badge').innerText = d.portBadge;
+    document.getElementById('port-h').innerText = d.portH;
+    document.getElementById('port-p').innerText = d.portP;
+    document.getElementById('port-list-h').innerText = d.portListH;
+    document.getElementById('row-f-reader').innerText = d.rowFReader;
+    document.getElementById('row-f-dl').innerText = d.rowFDl;
+    document.getElementById('row-f-cfg').innerText = d.rowFCfg;
+    document.getElementById('row-f-icon').innerText = d.rowFIcon;
+    document.getElementById('row-f-lib').innerText = d.rowFLib;
+
+    document.getElementById('footer-text').innerText = d.footer;
+  }
+
+  function openTab(tabName) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    const target = document.getElementById('tab-' + tabName);
+    if (target) target.classList.add('active');
+
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(btn => {
+      if (btn.getAttribute('onclick').includes(tabName)) {
+        btn.classList.add('active');
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
