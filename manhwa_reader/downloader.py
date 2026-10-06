@@ -41,7 +41,7 @@ def load_config() -> dict:
     return {
         "tg_api_id": 37560778,
         "tg_api_hash": "307da2f94fc6450afe139c91bcc59eaa",
-        "tg_bot_token": "8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA",
+        "tg_bot_token": "",
         "library_path": "library"
     }
 
@@ -127,6 +127,23 @@ def extract_archive_to_images(archive_path: Path, output_dir: Path) -> int:
     return count
 
 
+def extract_chapter_pdf(
+    pdf_path: Path,
+    output_dir: Path,
+    delete_pdf: bool = False,
+    progress_cb: Optional[Callable[[str], None]] = None
+) -> int:
+    """Extracts PDF pages to JPEG images and optionally deletes the original PDF."""
+    count = extract_pdf_to_images(pdf_path, output_dir, progress_cb=progress_cb)
+    if delete_pdf and pdf_path.exists():
+        try:
+            pdf_path.unlink()
+        except Exception as e:
+            if progress_cb:
+                progress_cb(f"Не вдалося видалити PDF: {e}")
+    return count
+
+
 class TelegramManhwaDownloader:
     def __init__(self, api_id: int, api_hash: str, session_path: Optional[str] = None, bot_token: Optional[str] = None):
         self.api_id = api_id
@@ -143,8 +160,8 @@ class TelegramManhwaDownloader:
         b_tok = self.bot_token or cfg.get("tg_bot_token")
 
         if b_tok:
-            bot_sess = str(Path(__file__).parent / "tg_bot_session")
-            self.client = TelegramClient(bot_sess, self.api_id, self.api_hash)
+            from telethon.sessions import MemorySession
+            self.client = TelegramClient(MemorySession(), self.api_id, self.api_hash)
             await self.client.start(bot_token=b_tok)
             return
 
@@ -160,6 +177,14 @@ class TelegramManhwaDownloader:
             await self.client.send_code_request(phone)
             code = input("Введіть код із Telegram: ")
             await self.client.sign_in(phone, code)
+
+    async def disconnect(self):
+        if self.client:
+            try:
+                await self.client.disconnect()
+            except Exception:
+                pass
+            self.client = None
 
     async def search_channel_chapters(
         self,
@@ -257,26 +282,39 @@ class TelegramManhwaDownloader:
             status_cb(f"Знайдено розділів/файлів: {len(found_items)}")
         return found_items
 
+
     async def download_chapter(
         self,
         item: Dict[str, Any],
         manhwa_dir: Path,
+        extract_to_jpeg: bool = False,
+        delete_pdf: bool = False,
         keep_raw: bool = False,
         status_cb: Optional[Callable[[str], None]] = None,
-        progress_cb: Optional[Callable[[float], None]] = None
+        progress_cb: Optional[Callable[[float], None]] = None,
+        force_redownload: bool = False
     ) -> Path:
-        """Downloads chapter and extracts pages into manhwa_dir/chapter_XXX/."""
+        """Downloads chapter as PDF or archive into manhwa_dir/chapter_XXX/, optionally extracting to JPEG."""
         ch_num = item.get("chapter", 1)
         ch_folder_name = f"chapter_{ch_num:03d}" if ch_num > 0 else f"chapter_msg_{item['id']}"
         chapter_dir = manhwa_dir / ch_folder_name
         chapter_dir.mkdir(parents=True, exist_ok=True)
 
-        # Check if already extracted
+        target_pdf_path = chapter_dir / f"chapter_pdf_{ch_num:03d}.pdf"
+
+        # Check existing content
         existing_imgs = list(chapter_dir.glob("*.jpg")) + list(chapter_dir.glob("*.png"))
-        if len(existing_imgs) > 2:
-            if status_cb:
-                status_cb(f"Глава {ch_num} вже існує ({len(existing_imgs)} сторінок). Пропуск.")
-            return chapter_dir
+        existing_pdfs = list(chapter_dir.glob("*.pdf"))
+
+        if not force_redownload:
+            if extract_to_jpeg and len(existing_imgs) > 2:
+                if status_cb:
+                    status_cb(f"Глава {ch_num} вже розпакована ({len(existing_imgs)} сторінок). Пропуск.")
+                return chapter_dir
+            elif not extract_to_jpeg and (existing_pdfs or len(existing_imgs) > 2):
+                if status_cb:
+                    status_cb(f"Глава {ch_num} вже існує. Пропуск.")
+                return chapter_dir
 
         raw_dir = manhwa_dir / ".temp_downloads"
         raw_dir.mkdir(parents=True, exist_ok=True)
@@ -297,30 +335,49 @@ class TelegramManhwaDownloader:
         )
 
         ext = raw_file_path.suffix.lower()
-        if status_cb:
-            status_cb(f"Розпакування сторінок для Глави {ch_num}...")
 
         if ext == ".pdf":
-            extract_pdf_to_images(raw_file_path, chapter_dir, progress_cb=status_cb)
+            import shutil
+            shutil.move(str(raw_file_path), str(target_pdf_path))
+
+            # Automatically set cover image if missing
+            cover_path = manhwa_dir / "cover.jpg"
+            if not cover_path.exists() and fitz:
+                try:
+                    doc = fitz.open(str(target_pdf_path))
+                    if len(doc) > 0:
+                        pix = doc[0].get_pixmap(dpi=150)
+                        pix.save(str(cover_path))
+                    doc.close()
+                except Exception:
+                    pass
+
+            if extract_to_jpeg:
+                if status_cb:
+                    status_cb(f"Розпакування сторінок для Глави {ch_num}...")
+                extract_pdf_to_images(target_pdf_path, chapter_dir, progress_cb=status_cb)
+                if delete_pdf:
+                    try:
+                        target_pdf_path.unlink()
+                    except Exception:
+                        pass
+            else:
+                if status_cb:
+                    status_cb(f"Збережено як PDF: Глава {ch_num}")
+
         elif ext in [".zip", ".cbz"]:
+            if status_cb:
+                status_cb(f"Розпакування архіву для Глави {ch_num}...")
             extract_archive_to_images(raw_file_path, chapter_dir)
+            if not keep_raw and raw_file_path.exists():
+                try:
+                    raw_file_path.unlink()
+                except Exception:
+                    pass
         else:
-            # Single file or unhandled
-            pass
-
-        # Check / set cover image
-        cover_path = manhwa_dir / "cover.jpg"
-        if not cover_path.exists():
-            first_pages = sorted(chapter_dir.glob("*.jpg"))
-            if first_pages:
-                import shutil
-                shutil.copy(first_pages[0], cover_path)
-
-        if not keep_raw and raw_file_path.exists():
-            try:
-                raw_file_path.unlink()
-            except Exception:
-                pass
+            # Other document types
+            import shutil
+            shutil.move(str(raw_file_path), str(chapter_dir / item["filename"]))
 
         return chapter_dir
 
