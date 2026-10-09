@@ -8,7 +8,7 @@ Allows reviewing and fine-tuning:
 Directly saves to Anki via AnkiConnect (ports 8766/8765) and .apkg.
 """
 
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint
 from PyQt6.QtGui import QFont, QColor, QCursor, QPixmap, QImage
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
@@ -26,6 +26,8 @@ class AnkiCardDialog(QWidget):
         super().__init__(parent)
         self.anki_service = anki_service
         self.image_bytes = None
+        self.dragging = False
+        self.drag_start_pos = QPoint()
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -282,6 +284,20 @@ class AnkiCardDialog(QWidget):
 
         main_layout.addWidget(self.frame)
 
+    def open_empty(self):
+        """Opens completely blank dialog without carrying over any text or expressions."""
+        self.word_edit.clear()
+        self.trans_edit.clear()
+        self.sent_edit.clear()
+        self.clear_image()
+        self.status_lbl.hide()
+        self.save_btn.setEnabled(True)
+        self.save_btn.setText("✅ Додати в Anki (англ манхва)")
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.word_edit.setFocus()
+
     def open_for_word(self, word: str, translation: str, sentence: str = ""):
         self.word_edit.setText(word)
         self.trans_edit.setPlainText(translation)
@@ -358,6 +374,25 @@ class AnkiCardDialog(QWidget):
             self.save_btn.setEnabled(False)
             self.card_saved_signal.emit(word)
             QTimer.singleShot(1400, self.hide)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.drag_start_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.dragging and event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self.drag_start_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self.dragging = False
+        super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:

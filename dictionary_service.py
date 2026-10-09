@@ -81,6 +81,11 @@ class DictionaryService:
 
     def save_cached(self, word: str, data: Dict[str, Any]):
         clean = word.strip().lower()
+        main_trans = data.get("main", "").strip()
+        # NEVER cache failed translations where translation is empty or matches raw English text
+        if not main_trans or (main_trans.lower() == clean and any(c.isascii() and c.isalpha() for c in clean)):
+            return
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
@@ -89,7 +94,7 @@ class DictionaryService:
                 )
                 conn.execute(
                     "INSERT INTO history (word, main_trans) VALUES (?, ?)",
-                    (clean, data.get("main", ""))
+                    (clean, main_trans)
                 )
                 conn.commit()
         except Exception as e:
@@ -116,20 +121,37 @@ class DictionaryService:
         except Exception as e:
             print(f"Clear history error: {e}")
 
+    def _fetch_fallback_translate(self, text: str) -> str:
+        """Fallback translation via MyMemory API when primary Google request has issues."""
+        try:
+            url = "https://api.mymemory.translated.net/get"
+            params = {"q": text, "langpair": "en|uk"}
+            resp = requests.get(url, params=params, timeout=3.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                t = data.get("responseData", {}).get("translatedText", "").strip()
+                if t and t.lower() != text.lower() and not t.startswith("MYMEMORY WARNING"):
+                    return t
+        except Exception as e:
+            print(f"Fallback translate error: {e}")
+        return ""
+
     def lookup(self, text: str) -> Dict[str, Any]:
         clean_text = text.strip()
         if not clean_text:
             return {"error": "Порожній запит"}
 
-        # Check cache first
+        # Check cache first (ignore bad cached entries where translation is identical to query)
         cached = self.get_cached(clean_text)
         if cached:
-            return cached
+            c_main = cached.get("main", "").strip()
+            if c_main and (c_main.lower() != clean_text.lower() or not any(c.isascii() and c.isalpha() for c in clean_text)):
+                return cached
 
         # Fetch Google Translate Single API
         gt_data = self._fetch_google_dict(clean_text)
 
-        # Quick attempt to fetch Free Dictionary API with very short timeout
+        # Quick attempt to fetch Free Dictionary API only for single words
         dict_data = None
         if " " not in clean_text and len(clean_text) < 30:
             dict_data = self._fetch_free_dictionary(clean_text)
@@ -175,12 +197,19 @@ class DictionaryService:
         main_trans = ""
         translit = ""
 
-        if "sentences" in gt_data:
+        if "sentences" in gt_data and isinstance(gt_data["sentences"], list):
             for s in gt_data["sentences"]:
-                if "trans" in s:
-                    main_trans += s["trans"]
-                if "src_translit" in s and s["src_translit"] and not translit:
-                    translit = s["src_translit"]
+                if isinstance(s, dict):
+                    if "trans" in s and s["trans"]:
+                        main_trans += s["trans"]
+                    if "src_translit" in s and s["src_translit"] and not translit:
+                        translit = s["src_translit"]
+
+        # If primary translation failed or returned the exact same English text:
+        if not main_trans or (main_trans.strip().lower() == original_text.strip().lower() and any(c.isascii() and c.isalpha() for c in original_text)):
+            fallback_trans = self._fetch_fallback_translate(original_text)
+            if fallback_trans:
+                main_trans = fallback_trans
 
         if not main_trans:
             main_trans = original_text
@@ -378,17 +407,15 @@ class DictionaryService:
         if not clean_text:
             return {"query": text, "cards": []}
 
-        dict_data = self._fetch_free_dictionary(clean_text)
         gt_data = self._fetch_google_dict(clean_text)
+        dict_data = None
 
         phonetic = ""
-        if dict_data:
-            phonetic = dict_data.get("phonetic", "")
-            if not phonetic:
-                for ph in dict_data.get("phonetics", []):
-                    if ph.get("text"):
-                        phonetic = ph["text"]
-                        break
+        if "sentences" in gt_data and isinstance(gt_data["sentences"], list):
+            for s in gt_data["sentences"]:
+                if isinstance(s, dict) and s.get("src_translit"):
+                    phonetic = s["src_translit"]
+                    break
 
         # Collect Google POS translations
         pos_ukr_map = {}
@@ -477,6 +504,20 @@ class DictionaryService:
                 "pos": pos
             }
             cards.append(card_data)
+
+        if not cards:
+            main_res = self.lookup(clean_text)
+            main_t = main_res.get("main", "")
+            cards.append({
+                "badge": "📖 СЛОВНИКОВА СТАТТЯ",
+                "title": f"{clean_text} {f'/{phonetic}/' if phonetic else ''}",
+                "translation": main_t,
+                "definitions": [f"• Переклад: {main_t}"],
+                "forms": [f"-ed: {clean_text}ed", f"-ing: {clean_text}ing", f"-s: {clean_text}s"],
+                "synonyms": [],
+                "word": clean_text,
+                "pos": "word"
+            })
 
         return {
             "query": clean_text,

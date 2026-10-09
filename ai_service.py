@@ -114,19 +114,21 @@ class AIService:
 
     def ask_followup(self, sentence: str, previous_ai_response: str, question: str) -> str:
         """
-        Follow-up question with strict 1-step context memory to prevent token waste:
-        [Sentence] + [Previous AI Answer] + [New Question].
+        Follow-up question with strict token-efficient 1-step context memory:
+        [First sentence of session] + [Previous AI Answer] + [New Question].
         """
         system_instruction = (
             "Ти — Вікір, помічник для читання манхви. Відповідай українською мовою лаконічно, "
             "прямо по суті запитання, зберігаючи компактність та високу точність без зайвої води."
         )
 
-        prompt = (
-            f"Речення для розбору:\n\"{sentence.strip()}\"\n\n"
-            f"Попередня відповідь ШІ:\n{previous_ai_response.strip()}\n\n"
-            f"Запитання користувача:\n{question.strip()}\n\n"
-            "Дай точну і змістовну відповідь."
-        )
+        prompt_parts = []
+        if sentence.strip():
+            prompt_parts.append(f"Початкове речення для розбору:\n\"{sentence.strip()}\"")
+        if previous_ai_response.strip():
+            prompt_parts.append(f"Попередня відповідь ШІ:\n{previous_ai_response.strip()}")
+        prompt_parts.append(f"Запитання користувача:\n{question.strip()}\n\nДай точну і змістовну відповідь.")
+
+        prompt = "\n\n".join(prompt_parts)
 
         return self._call_gemini(prompt, system_instruction=system_instruction)

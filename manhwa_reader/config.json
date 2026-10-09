@@ -6,16 +6,16 @@
   "fullscreen": false,
   "scroll_speed": 60,
   "auto_preload_threshold": 0.67,
-  "language": "en",
-  "delete_pdf_after_extract": false,
+  "language": "uk",
+  "delete_pdf_after_extract": true,
   "tg_api_id": 37560778,
   "tg_api_hash": "307da2f94fc6450afe139c91bcc59eaa",
-  "tg_bot_token": "",
+  "tg_bot_token": "8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA",
   "bookmarks": {
     "Revenge of the Iron-Blooded Sword Hound": {
-      "chapter": 2,
-      "scroll_y": 0,
-      "chapter_progress": 0.0
+      "chapter": 1,
+      "scroll_y": 67277,
+      "chapter_progress": 0.47
     }
   },
   "keep_prev_threshold": 0.33,

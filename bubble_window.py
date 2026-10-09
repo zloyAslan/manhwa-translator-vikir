@@ -45,6 +45,7 @@ class BubbleWindow(QWidget):
         self.config = config
         self.current_result = None
         self.active_lookup_thread = None
+        self.is_article_view = False
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -341,6 +342,25 @@ class BubbleWindow(QWidget):
         clouds = result.get("clouds", [])
         query = result.get("query", "")
         words = query.split()
+
+        self.is_article_view = False
+        self.article_btn.setText("🌱 Словотвір")
+        self.article_btn.setToolTip("Показати всі граматичні форми та статтю словника")
+        self.article_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.18);
+                color: #60A5FA;
+                border: 1px solid rgba(59, 130, 246, 0.4);
+                border-radius: 6px;
+                padding: 0 10px;
+                font-weight: 900;
+            }
+            QPushButton:hover {
+                background-color: #2563EB;
+                color: #FFFFFF;
+            }
+        """)
+
         if len(words) in (1, 2) and clouds:
             self.article_btn.show()
         else:
@@ -367,11 +387,32 @@ class BubbleWindow(QWidget):
     def on_show_word_article(self):
         if not self.current_result:
             return
+
+        if self.is_article_view:
+            # Toggle back to normal translation view
+            self.display_results(self.current_result)
+            return
+
+        # Switch to article view
         query = self.current_result.get("query", "")
-        self.status_lbl.setText(f"📖 Завантаження статті для '{query}'...")
-        self.status_lbl.show()
+        self.is_article_view = True
+        self.article_btn.setText("★ Переклад")
+        self.article_btn.setToolTip("Повернутися до звичайного перекладу")
+        self.article_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F59E0B, stop:1 #D97706);
+                color: #000000;
+                border: 1px solid #F59E0B;
+                border-radius: 6px;
+                padding: 0 10px;
+                font-weight: 900;
+            }
+            QPushButton:hover {
+                background: #FBBF24;
+            }
+        """)
+
         article = self.dict_service.get_word_article(query)
-        self.status_lbl.hide()
         self.clear_clouds()
         cards = article.get("cards", [])
         if not cards:

@@ -13,7 +13,7 @@ from PyQt6.QtGui import (
     QPainter, QColor, QPen, QCursor, QFont, QGuiApplication, QImage
 )
 from PyQt6.QtWidgets import QWidget
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 from rapidocr_onnxruntime import RapidOCR
 
@@ -52,16 +52,31 @@ class OcrWorker(QThread):
 
     def run(self):
         try:
-            # Convert PIL image to numpy array for RapidOCR
-            np_img = np.array(self.pil_image)
+            # 1. Add white margin padding so text touching the border is not cut off
+            padded_img = ImageOps.expand(self.pil_image, border=25, fill='white')
+            np_img = np.array(padded_img)
             result, elapse = _ocr_engine(np_img)
             
             if result:
-                lines = [line[1] for line in result]
+                # 2. Sort detected boxes strictly from top to bottom, left to right
+                def get_y(item):
+                    box = item[0]
+                    return (box[0][1] + box[2][1]) / 2.0
+                def get_x(item):
+                    box = item[0]
+                    return box[0][0]
+
+                # Group into horizontal bands (16px threshold) then sort left to right
+                sorted_res = sorted(result, key=lambda item: (round(get_y(item) / 16.0), get_x(item)))
+                lines = [line[1] for line in sorted_res]
                 raw_text = " ".join(lines)
             else:
                 raw_text = ""
 
+            # 3. Clean up noise artifacts like ^, ~, |, stray question marks on words
+            raw_text = re.sub(r'[\^~\|_\\@]', ' ', raw_text)
+            raw_text = re.sub(r'(?<=\s)\?(\w+)', r'\1', raw_text)
+            raw_text = re.sub(r'^\?(\w+)', r'\1', raw_text)
             clean_text = raw_text.replace("\r", " ").replace("\n", " ")
             clean_text = re.sub(r"\s+", " ", clean_text)
             clean_text = re.sub(r"(\w+)-\s+(\w+)", r"\1\2", clean_text).strip()

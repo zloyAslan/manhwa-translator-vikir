@@ -1,6 +1,6 @@
 {
-  "pos_x": 64,
-  "pos_y": 113,
+  "pos_x": 1192,
+  "pos_y": 169,
   "mascot_style": "sticker",
   "mascot_size": 95,
   "bubble_opacity": 0.98,
@@ -11,6 +11,6 @@
   "play_sound": false,
   "theme": "comic_light",
   "gemini_api_key": "AQ.Ab8RN6JameZCI5KID03P781w8vgYtkJDi-5VMfBCOuI5zq7o6g",
-  "window_width": 710,
-  "window_height": 377
+  "window_width": 765,
+  "window_height": 449
 }

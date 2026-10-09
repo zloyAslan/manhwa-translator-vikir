@@ -290,8 +290,32 @@ class AIChatWindow(QWidget):
         self.sessions_btn.clicked.connect(self.show_sessions_menu)
         top_bar.addWidget(self.sessions_btn)
 
+        # Exit application button '⏻ Вийти'
+        self.exit_btn = QPushButton("⏻ Вийти")
+        self.exit_btn.setToolTip("Повністю закрити перекладач")
+        self.exit_btn.setFont(QFont("Segoe UI Black", 8))
+        self.exit_btn.setFixedHeight(24)
+        self.exit_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.exit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #F87171;
+                border: 1px solid rgba(239, 68, 68, 0.35);
+                border-radius: 6px;
+                padding: 0 8px;
+                font-weight: 800;
+            }
+            QPushButton:hover {
+                background-color: #DC2626;
+                color: #FFFFFF;
+            }
+        """)
+        self.exit_btn.clicked.connect(QApplication.quit)
+        top_bar.addWidget(self.exit_btn)
+
         # Close button '✕'
         close_btn = QLabel("✕")
+        close_btn.setToolTip("Сховати вікно AI")
         close_btn.setFixedSize(24, 24)
         close_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
         close_btn.setFont(QFont("Segoe UI Black", 10))
@@ -491,8 +515,14 @@ class AIChatWindow(QWidget):
         self.show()
         self.raise_()
         self.activateWindow()
-        if text:
-            self.chat_input.setText(text)
+        clean_text = text.strip()
+        if clean_text:
+            # If the current session already has messages, start a fresh session for the new sentence
+            # so each sentence has its own isolated memory without leaking previous chats.
+            if self.current_session and len(self.current_session.messages) > 0:
+                self.start_new_chat(show_welcome=False)
+
+            self.chat_input.setText(clean_text)
             self.chat_input.selectAll()
             self.chat_input.setFocus()
 

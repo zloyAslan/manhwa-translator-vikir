@@ -11,3 +11,5 @@ manhwa_reader/__pycache__/
 manhwa_reader/library/
 manhwa_reader/*.session
 manhwa_reader/.temp_downloads/
+*.zip
+*.exe

@@ -40,6 +40,7 @@ class HotkeySignal(QObject):
     sentence_ocr_triggered = pyqtSignal()
     panel_crop_triggered = pyqtSignal()
     ai_chat_triggered = pyqtSignal()
+    blank_anki_triggered = pyqtSignal()
 
 
 class ManhwaTranslatorApp:
@@ -100,6 +101,7 @@ class ManhwaTranslatorApp:
         self.hotkey_emitter.sentence_ocr_triggered.connect(lambda: self.start_ocr("sentence"))
         self.hotkey_emitter.panel_crop_triggered.connect(self.start_panel_cropper)
         self.hotkey_emitter.ai_chat_triggered.connect(self.on_ai_hotkey)
+        self.hotkey_emitter.blank_anki_triggered.connect(self.on_open_blank_anki)
         self.setup_hotkeys()
 
         self.mascot.show()
@@ -135,6 +137,9 @@ class ManhwaTranslatorApp:
 
         act_panel_crop = tray_menu.addAction("🖼️ Захопити арт у картку (Alt+D)")
         act_panel_crop.triggered.connect(self.start_panel_cropper)
+
+        act_blank_anki = tray_menu.addAction("🎴 Створити порожню картку (Alt+S)")
+        act_blank_anki.triggered.connect(self.on_open_blank_anki)
 
         act_ai = tray_menu.addAction("🤖 ШІ-розбір речень та ідіом (Alt+A)")
         act_ai.triggered.connect(self.on_ai_hotkey)
@@ -202,6 +207,12 @@ class ManhwaTranslatorApp:
         except Exception:
             pass
 
+        # 6. Blank Anki Card Creator hotkey (Alt+S)
+        try:
+            keyboard.add_hotkey("alt+s", lambda: self.hotkey_emitter.blank_anki_triggered.emit())
+        except Exception:
+            pass
+
     def start_ocr(self, mode: str = "word"):
         self.bubble_window.hide_bubble()
         self.anki_dialog.hide()
@@ -229,8 +240,24 @@ class ManhwaTranslatorApp:
     def on_panel_captured(self, img_bytes: bytes):
         self.anki_dialog.set_image(img_bytes)
 
-    def open_anki_dialog(self, word: str, translation: str, sentence: str):
-        self.anki_dialog.open_for_word(word, translation, sentence)
+    def on_open_blank_anki(self):
+        if not self.anki_dialog.isVisible():
+            screen = QGuiApplication.primaryScreen().availableGeometry()
+            cx = screen.center().x() - (self.anki_dialog.width() // 2)
+            cy = screen.center().y() - (self.anki_dialog.height() // 2)
+            self.anki_dialog.move(cx, cy)
+        self.anki_dialog.open_empty()
+
+    def open_anki_dialog(self, word: str = "", translation: str = "", sentence: str = ""):
+        if not self.anki_dialog.isVisible():
+            screen = QGuiApplication.primaryScreen().availableGeometry()
+            cx = screen.center().x() - (self.anki_dialog.width() // 2)
+            cy = screen.center().y() - (self.anki_dialog.height() // 2)
+            self.anki_dialog.move(cx, cy)
+        if word or translation or sentence:
+            self.anki_dialog.open_for_word(word, translation, sentence)
+        else:
+            self.anki_dialog.open_empty()
 
     def on_translate_hotkey(self):
         auto_paste = self.config.get("auto_paste_clipboard", True)
