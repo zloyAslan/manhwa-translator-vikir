@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
 )
 from dictionary_service import DictionaryService
 from anki_service import AnkiService, DECKS_DIR
+from config import config
+from localization import tr
 
 class HistoryWindow(QWidget):
     word_selected = pyqtSignal(str)
@@ -22,9 +24,13 @@ class HistoryWindow(QWidget):
         self.dict_service = dict_service
         self.anki_service = AnkiService()
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
-        self.setWindowTitle("📖 Словник Манхви - Історія Перекладів")
-        self.resize(440, 530)
+        self.resize(460, 540)
         self.init_ui()
+        self.retranslate_ui()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.retranslate_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -33,19 +39,19 @@ class HistoryWindow(QWidget):
 
         # Header
         header_layout = QHBoxLayout()
-        header = QLabel("🗡️ Словник слів з манхви")
-        header.setFont(QFont("Segoe UI Black", 12))
-        header.setStyleSheet("color: #0F172A;")
-        header_layout.addWidget(header)
+        self.header_lbl = QLabel()
+        self.header_lbl.setFont(QFont("Segoe UI Black", 12))
+        self.header_lbl.setStyleSheet("color: #F59E0B;")
+        header_layout.addWidget(self.header_lbl)
 
         header_layout.addStretch()
 
         self.anki_badge = QLabel(f"⭐ Anki: {self.anki_service.get_cards_count()}")
         self.anki_badge.setFont(QFont("Segoe UI Black", 9))
         self.anki_badge.setStyleSheet("""
-            background-color: #FEF08A;
-            color: #713F12;
-            border: 1.5px solid #854D0E;
+            background-color: rgba(245, 158, 11, 0.15);
+            color: #FBBF24;
+            border: 1.5px solid rgba(245, 158, 11, 0.4);
             border-radius: 6px;
             padding: 3px 8px;
         """)
@@ -55,17 +61,17 @@ class HistoryWindow(QWidget):
 
         # Search filter
         self.filter_input = QLineEdit()
-        self.filter_input.setPlaceholderText("🔍 Пошук по історії слів...")
         self.filter_input.setFont(QFont("Segoe UI", 10))
         self.filter_input.setStyleSheet("""
             QLineEdit {
-                border: 2px solid #CBD5E1;
+                border: 1.5px solid rgba(255, 255, 255, 0.15);
                 border-radius: 8px;
                 padding: 6px 10px;
-                background: #F8FAFC;
+                background: #121622;
+                color: #F3F4F6;
             }
             QLineEdit:focus {
-                border-color: #2563EB;
+                border-color: #F59E0B;
             }
         """)
         self.filter_input.textChanged.connect(self.apply_filter)
@@ -76,23 +82,26 @@ class HistoryWindow(QWidget):
         self.list_widget.setFont(QFont("Segoe UI", 10))
         self.list_widget.setStyleSheet("""
             QListWidget {
-                border: 2.5px solid #0F172A;
+                border: 1.5px solid rgba(255, 255, 255, 0.12);
                 border-radius: 10px;
-                background: #FFFFFF;
+                background: #090B10;
+                color: #F3F4F6;
                 padding: 4px;
             }
             QListWidget::item {
                 padding: 8px 12px;
-                border-bottom: 1px solid #E2E8F0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
                 border-radius: 6px;
                 margin-bottom: 2px;
             }
             QListWidget::item:hover {
-                background: #EFF6FF;
+                background: rgba(245, 158, 11, 0.12);
+                color: #FBBF24;
             }
             QListWidget::item:selected {
-                background: #2563EB;
-                color: #FFFFFF;
+                background: #F59E0B;
+                color: #000000;
+                font-weight: bold;
             }
         """)
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
@@ -102,62 +111,92 @@ class HistoryWindow(QWidget):
         btn_layout_1 = QHBoxLayout()
         btn_layout_1.setSpacing(8)
 
-        self.copy_btn = QPushButton("📋 Скопіювати")
+        self.copy_btn = QPushButton()
         self.copy_btn.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        self.copy_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #121622;
+                color: #E2E8F0;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 8px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover {
+                background-color: #1E293B;
+                border-color: #F59E0B;
+            }
+        """)
         self.copy_btn.clicked.connect(self.copy_selected)
         btn_layout_1.addWidget(self.copy_btn)
 
-        self.anki_btn = QPushButton("⭐ Додати в Anki")
+        self.anki_btn = QPushButton()
         self.anki_btn.setFont(QFont("Segoe UI Black", 9))
         self.anki_btn.setStyleSheet("""
             QPushButton {
-                background-color: #FEF08A;
-                color: #713F12;
-                border: 2px solid #713F12;
+                background-color: rgba(245, 158, 11, 0.18);
+                color: #FBBF24;
+                border: 1px solid rgba(245, 158, 11, 0.45);
+                border-radius: 8px;
+                padding: 6px 12px;
             }
             QPushButton:hover {
-                background-color: #FDE047;
+                background-color: #F59E0B;
+                color: #000000;
             }
         """)
         self.anki_btn.clicked.connect(self.add_selected_to_anki)
         btn_layout_1.addWidget(self.anki_btn)
 
-        self.clear_btn = QPushButton("🗑️ Очистити")
+        self.clear_btn = QPushButton()
         self.clear_btn.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        self.clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #121622;
+                color: #EF4444;
+                border: 1px solid rgba(239, 68, 68, 0.35);
+                border-radius: 8px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.2);
+            }
+        """)
         self.clear_btn.clicked.connect(self.clear_history)
         btn_layout_1.addWidget(self.clear_btn)
 
         layout.addLayout(btn_layout_1)
 
         # Bottom buttons row 2: Open Anki folder
-        self.open_anki_folder_btn = QPushButton("📦 Відкрити папку з колодою Anki (.apkg)")
+        self.open_anki_folder_btn = QPushButton()
         self.open_anki_folder_btn.setFont(QFont("Segoe UI Black", 9))
         self.open_anki_folder_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1E293B;
-                color: #FFFFFF;
-                border: 2px solid #0F172A;
+                background-color: #121622;
+                color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
                 padding: 7px;
                 border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #334155;
+                background-color: #1E293B;
+                color: #FFFFFF;
+                border-color: #F59E0B;
             }
         """)
         self.open_anki_folder_btn.clicked.connect(self.open_anki_folder)
         layout.addWidget(self.open_anki_folder_btn)
 
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #F1F5F9;
-                border: 2px solid #0F172A;
-                border-radius: 8px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #E2E8F0;
-            }
-        """)
+        self.setStyleSheet("background-color: #0B0E14;")
+
+    def retranslate_ui(self):
+        ul = config.ui_lang
+        self.setWindowTitle(tr("hist_window_title", ul))
+        self.header_lbl.setText(tr("hist_header", ul))
+        self.filter_input.setPlaceholderText(tr("hist_search_ph", ul))
+        self.copy_btn.setText(tr("hist_copy_btn", ul))
+        self.anki_btn.setText(tr("hist_anki_btn", ul))
+        self.clear_btn.setText(tr("hist_clear_btn", ul))
+        self.open_anki_folder_btn.setText(tr("hist_open_folder_btn", ul))
 
     def load_history(self):
         self.list_widget.clear()

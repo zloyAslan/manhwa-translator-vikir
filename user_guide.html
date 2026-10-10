@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M_Translate & Manhwa Reader — User Guide / Інструкція користувача</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090B10;
+      --card-bg: rgba(18, 22, 34, 0.88);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #F59E0B;
+      --accent-grad: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+      --cyan: #2DD4BF;
+      --cyan-grad: linear-gradient(135deg, #2DD4BF 0%, #0D9488 100%);
+      --text: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      padding: 30px 20px 80px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(245, 158, 11, 0.07) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(45, 212, 191, 0.06) 0%, transparent 45%);
+      min-height: 100vh;
+    }
+
+    .container { max-width: 980px; margin: 0 auto; }
+
+    /* Language Switcher */
+    .lang-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .lang-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font);
+    }
+    .lang-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+    .lang-btn.active {
+      background: var(--accent-grad);
+      color: #000;
+      border-color: transparent;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 26px;
+      padding: 36px 24px;
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #F59E0B, #2DD4BF, #3B82F6);
+    }
+    .badge-ver {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      background: rgba(245, 158, 11, 0.15);
+      color: #F59E0B;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+    h1 span.gold { background: var(--accent-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    h1 span.cyan { background: var(--cyan-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--text-muted); font-size: 1rem; max-width: 720px; margin: 0 auto; }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(13, 16, 26, 0.85);
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      flex: 1 1 130px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: #000;
+      background: var(--accent-grad);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Tab Panes */
+    .tab-pane { display: none; animation: fadeIn 0.22s ease; }
+    .tab-pane.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Steps */
+    .step-item { display: flex; gap: 16px; margin-bottom: 20px; }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--accent-grad);
+      color: #000; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 1.05rem;
+    }
+    .step-content { flex: 1; }
+    .step-content h3 { font-size: 1.05rem; margin-bottom: 4px; color: #fff; }
+    .step-content p { color: var(--text-muted); font-size: 0.92rem; }
+
+    /* Grids */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 18px 0; }
+    .grid-item {
+      background: rgba(13, 16, 26, 0.65);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .grid-item h4 { font-size: 1rem; margin-bottom: 6px; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .grid-item p { font-size: 0.88rem; color: var(--text-muted); }
+
+    /* Alerts */
+    .alert {
+      border-radius: 12px; padding: 14px 18px; margin: 16px 0;
+      display: flex; gap: 12px; align-items: flex-start; font-size: 0.92rem;
+    }
+    .alert-gold { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #FDE68A; }
+    .alert-cyan { background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.3); color: #99F6E4; }
+    .alert-danger { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #FCA5A5; }
+
+    /* Keyboard hotkey pills */
+    .kbd {
+      display: inline-block; padding: 2px 7px;
+      font-family: var(--mono); font-size: 0.8rem; font-weight: 700;
+      color: #F3F4F6; background: #1F2937;
+      border: 1px solid #374151; border-bottom-width: 2px; border-radius: 6px;
+    }
+    code {
+      font-family: var(--mono); background: rgba(0, 0, 0, 0.45);
+      padding: 3px 7px; border-radius: 6px; color: #F59E0B;
+      font-size: 0.88em; border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.92rem; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+    th { color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 0.76rem; letter-spacing: 0.05em; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Top Language Switcher -->
+  <div class="lang-bar">
+    <button class="lang-btn active" onclick="setLang('uk')">Українська</button>
+    <button class="lang-btn" onclick="setLang('en')">English</button>
+    <button class="lang-btn" onclick="setLang('ru')">Русский</button>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="badge-ver" id="hdr-badge">🚀 Версія 1.0 Portable • Dark Fantasy Edition</div>
+    <h1 id="hdr-title"><span class="gold">M_Translate</span> & <span class="cyan">Manhwa Reader</span></h1>
+    <p class="subtitle" id="hdr-sub">
+      Повноцінна автономна екосистема для читання манхви в оригіналі, миттєвого оверлейного перекладу, навчання мови з розумним ШІ та створення карток Anki в один клік.
+    </p>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="openTab('overview')" id="tab-btn-overview">🌟 Для чого це?</button>
+    <button class="tab-btn" onclick="openTab('programs')" id="tab-btn-programs">📦 Яку програму обрати?</button>
+    <button class="tab-btn" onclick="openTab('quickstart')" id="tab-btn-quickstart">⚡ Швидкий старт</button>
+    <button class="tab-btn" onclick="openTab('hotkeys')" id="tab-btn-hotkeys">⌨️ Гарячі клавіші</button>
+    <button class="tab-btn" onclick="openTab('ai_anki')" id="tab-btn-ai_anki">🤖 ШІ та Anki</button>
+    <button class="tab-btn" onclick="openTab('safety')" id="tab-btn-safety">🛡️ Безпека & Дисклеймер</button>
+  </nav>
+
+  <!-- TAB: OVERVIEW -->
+  <div id="tab-overview" class="tab-pane active">
+    <div class="card">
+      <div class="card-title" id="ov-title">🌟 Навіщо створено цей проект?</div>
+      <p style="color:var(--text-muted); font-size:0.95rem; margin-bottom:18px;" id="ov-desc">
+        Головна мета проекту — перетворити читання улюбленої манхви (англійською чи іншими мовами) на захоплюючий, швидкий та ефективний спосіб вивчення мови без перемикання між десятком вкладок перекладача.
+      </p>
+
+      <div class="grid">
+        <div class="grid-item">
+          <h4 id="ov-c1-h">📖 Комфортне читання (Webtoon)</h4>
+          <p id="ov-c1-p">Плавний вертикальний скрол без білих смуг, безшовний перегляд довгих розділів, підтримка як PDF, так і JPEG-стрічок.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="ov-c2-h">⚡ Переклад без відриву від читання</h4>
+          <p id="ov-c2-p">Виділили потрібне слово чи фразу прямо з екрана комбінацією клавіш — і поверх манхви з'являється стильний комікс-бабл з миттєвим перекладом.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="ov-c3-h">🧠 Розбір сленгу та ідіом через ШІ</h4>
+          <p id="ov-c3-p">ШІ пояснює не просто сухий переклад, а граматичні звороти, жарти, складний контекст та фразеологізми персонажів.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="ov-c4-h">⭐ Картки в Anki за 2 секунди</h4>
+          <p id="ov-c4-p">Зберігайте слово разом із реченням та артом з розділу манхви у свою пам'ять інтервальних повторень без зайвих ручних дій.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PROGRAMS -->
+  <div id="tab-programs" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="pr-title">📦 Три автономні версії — Оберіть свою</div>
+      <p style="color:var(--text-muted); margin-bottom:16px;" id="pr-sub">
+        Усі програми повністю автономні (Portable single-file) — їм не потрібен встановлений Python чи додаткові бібліотеки.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th id="th-pr-name">Файл (.exe)</th>
+            <th id="th-pr-size">Вага</th>
+            <th id="th-pr-desc">Що всередині та для кого</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>lm_reader.exe</code></td>
+            <td><b>~75 MB</b></td>
+            <td id="pr-row-reader"><b>Тільки Читалка та Хмара.</b> Ідеально, якщо ви хочете просто читати вебтуни, качати глави з Telegram або користуватися безкоштовною хмарою манхви без перекладача.</td>
+          </tr>
+          <tr>
+            <td><code>m_translate.exe</code></td>
+            <td><b>~127 MB</b></td>
+            <td id="pr-row-trans"><b>Тільки Оверлейний Перекладач.</b> Працює поверх БУДЬ-ЯКИХ програм (браузера, читалок, ігор). Містить у собі нейромережу розпізнавання тексту (OCR), вікно ШІ та Anki.</td>
+          </tr>
+          <tr>
+            <td><code>m_reader_t.exe</code></td>
+            <td><b>~145 MB</b></td>
+            <td id="pr-row-suite"><b>Все в одному (Комбайн).</b> Читалка і перекладач запускаються разом в одному процесі. Кнопка «⚔️ Translate» у читалці миттєво викликає перекладач.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="alert alert-cyan" id="pr-note">
+        <span>💡 <b>Порада:</b> Якщо вам потрібен повний досвід — запускайте <code>m_reader_t.exe</code>. Якщо ви читаєте в браузері — запустіть лише <code>m_translate.exe</code>.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: QUICK START -->
+  <div id="tab-quickstart" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="qs-title">⚡ Швидкий старт за 3 простих кроки</div>
+
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3 id="qs-s1-h">Розпакуйте та запустіть</h3>
+          <p id="qs-s1-p">Витягніть файли з ZIP-архіву в будь-яку зручну папку на ПК (Робочий стіл, диск D: або флешка) і запустіть потрібний .exe файл.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3 id="qs-s2-h">Відкрийте бібліотеку або Хмарне сховище</h3>
+          <p id="qs-s2-p">У читалці перейдіть у вкладку «Хмарне сховище» для онлайн-читання або у «TG Завантажувач» для збереження манхви на комп'ютер у власну папку <code>library</code>.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3 id="qs-s3-h">Перекладайте за допомогою значка чи хоткею</h3>
+          <p id="qs-s3-p">Клікніть по плаваючому неоновому значку <b>文 / A</b> або затисніть гарячі клавіші для миттєвого захоплення тексту з екрана.</p>
+        </div>
+      </div>
+
+      <div class="alert alert-gold" id="qs-alert">
+        <span>📌 <b>Чистота системи:</b> Додатки не засмічують реєстр Windows і не створюють прихованих системних служб. Всі завантажені манхви залишаються поруч із програмою.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: HOTKEYS -->
+  <div id="tab-hotkeys" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="hk-title">⌨️ Гарячі клавіші та навігація</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th id="th-hk-key">Комбінація клавіш</th>
+            <th id="th-hk-act">Дія</th>
+            <th id="th-hk-mod">Де діє</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="kbd">Alt</span> + <span class="kbd">Q</span></td>
+            <td id="hk-r1">Відкрити / приховати вікно перекладу</td>
+            <td id="hk-m1">Усі програми</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Alt</span> + <span class="kbd">E</span> або <span class="kbd">F12</span></td>
+            <td id="hk-r2"><b>Захоплення слова з екрана:</b> виділіть прямокутник мишею для розпізнавання тексту</td>
+            <td id="hk-m2">Усі програми</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Alt</span> + <span class="kbd">W</span></td>
+            <td id="hk-r3"><b>Захоплення цілого речення</b> для створення картки в Anki</td>
+            <td id="hk-m3">Усі програми</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Alt</span> + <span class="kbd">D</span></td>
+            <td id="hk-r4"><b>Вирізання арту:</b> збереження красивого кадру з манхви на картку</td>
+            <td id="hk-m4">Усі програми</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">H</span></td>
+            <td id="hk-r5"><b>Zen Mode:</b> приховати/показати панель керування читалки</td>
+            <td id="hk-m5">Читалка</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">F11</span></td>
+            <td id="hk-r6">Увімкнути / вимкнути повноекранний режим читання</td>
+            <td id="hk-m6">Читалка</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Down</span> / <span class="kbd">S</span></td>
+            <td id="hk-r7">Плавне гортання глави вниз</td>
+            <td id="hk-m7">Читалка</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB: AI & ANKI -->
+  <div id="tab-ai_anki" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="aa-title">🤖 Налаштування ШІ Gemini та карток Anki</div>
+
+      <div class="grid">
+        <div class="grid-item">
+          <h4 id="aa-ai-h">✨ Власний ключ Gemini AI (Безкоштовно)</h4>
+          <p id="aa-ai-p">
+            Щоб використовувати розумного асистента без обмежень, перейдіть на <b>aistudio.google.com</b>, натисніть <i>«Create API Key»</i> (це повністю безкоштовно) та вставте його у <b>Налаштування ➔ AI Gemini</b> у перекладачі. Ваш ключ зберігається лише на вашому ПК.
+          </p>
+        </div>
+        <div class="grid-item">
+          <h4 id="aa-anki-h">🗂️ Синхронізація з Anki</h4>
+          <p id="aa-anki-p">
+            Встановіть програму Anki на ПК та плагін <b>AnkiConnect</b> (код: <code>2055492159</code>). Додаток сам знайде підключення, створить красиву колоду «англ манхва» з темною темою або дозволить експортувати картки файлом .apkg.
+          </p>
+        </div>
+      </div>
+
+      <div class="alert alert-cyan" id="aa-tip">
+        <span>💡 <b>Мова відповідей ШІ:</b> У налаштуваннях перекладача ви можете окремо вибрати, якою мовою ШІ пояснюватиме граматику та ідіоми (Українська, English чи Русский).</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: SAFETY -->
+  <div id="tab-safety" class="tab-pane">
+    <div class="card">
+      <div class="card-title" style="color:#F87171;" id="sf-title">🛡️ Безпека, Приватність & Дисклеймер</div>
+      
+      <div class="alert alert-danger" id="sf-alert-priv">
+        <div>
+          <b id="sf-priv-h">🔒 100% Локальна приватність:</b>
+          <p id="sf-priv-p" style="margin-top:4px;">
+            Нейромережа розпізнавання тексту (OCR) працює <b>повністю офлайн на вашому процесорі</b>. Ваші скріншоти та текст нікуди не відправляються. Запити до ШІ здійснюються напряму між вашим комп'ютером та серверами Google за вашим персональним ключем.
+          </p>
+        </div>
+      </div>
+
+      <h3 style="color:#fff; margin:16px 0 8px; font-size:1.05rem;" id="sf-disc-h">⚠️ Дисклеймер (Відмова від відповідальності):</h3>
+      <p style="color:var(--text-muted); font-size:0.92rem; line-height:1.6;" id="sf-disc-p">
+        Цей програмний комплекс розроблений <b>виключно для некомерційного використання, особистого читання та освітніх цілей</b> (вивчення іноземних мов). Усі авторські права на манхву, арт та оригінальні твори належать їхнім авторам та видавництвам. Додаток не розміщує піратський контент і виступає виключно як персональний інструмент перегляду документів та читання.
+      </p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p id="footer-text">M_Translate & Manhwa Reader Ecosystem • Version 1.0 • 2026</p>
+  </footer>
+</div>
+
+<script>
+  const i18n = {
+    uk: {
+      hdrBadge: "🚀 Версія 1.0 Portable • Dark Fantasy Edition",
+      hdrTitle: "<span class='gold'>M_Translate</span> & <span class='cyan'>Manhwa Reader</span>",
+      hdrSub: "Повноцінна автономна екосистема для читання манхви в оригіналі, миттєвого оверлейного перекладу, навчання мови з розумним ШІ та створення карток Anki в один клік.",
+      tabOverview: "🌟 Для чого це?",
+      tabPrograms: "📦 Яку програму обрати?",
+      tabQuickstart: "⚡ Швидкий старт",
+      tabHotkeys: "⌨️ Гарячі клавіші",
+      tabAiAnki: "🤖 ШІ та Anki",
+      tabSafety: "🛡️ Безпека & Дисклеймер",
+      ovTitle: "🌟 Навіщо створено цей проект?",
+      ovDesc: "Головна мета проекту — перетворити читання улюбленої манхви (англійською чи іншими мовами) на захоплюючий, швидкий та ефективний спосіб вивчення мови без перемикання між десятком вкладок перекладача.",
+      ovC1H: "📖 Комфортне читання (Webtoon)",
+      ovC1P: "Плавний вертикальний скрол без білих смуг, безшовний перегляд довгих розділів, підтримка як PDF, так і JPEG-стрічок.",
+      ovC2H: "⚡ Переклад без відриву від читання",
+      ovC2P: "Виділили потрібне слово чи фразу прямо з екрана комбінацією клавіш — і поверх манхви з'являється стильний комікс-бабл з миттєвим перекладом.",
+      ovC3H: "🧠 Розбір сленгу та ідіом через ШІ",
+      ovC3P: "ШІ пояснює не просто сухий переклад, а граматичні звороти, жарти, складний контекст та фразеологізми персонажів.",
+      ovC4H: "⭐ Картки в Anki за 2 секунди",
+      ovC4P: "Зберігайте слово разом із реченням та артом з розділу манхви у свою пам'ять інтервальних повторень без зайвих ручних дій.",
+      prTitle: "📦 Три автономні версії — Оберіть свою",
+      prSub: "Усі програми повністю автономні (Portable single-file) — їм не потрібен встановлений Python чи додаткові бібліотеки.",
+      thPrName: "Файл (.exe)",
+      thPrSize: "Вага",
+      thPrDesc: "Що всередині та для кого",
+      prRowReader: "<b>Тільки Читалка та Хмара.</b> Ідеально, якщо ви хочете просто читати вебтуни, качати глави з Telegram або користуватися безкоштовною хмарою манхви без перекладача.",
+      prRowTrans: "<b>Тільки Оверлейний Перекладач.</b> Працює поверх БУДЬ-ЯКИХ програм (браузера, читалок, ігор). Містить у собі нейромережу розпізнавання тексту (OCR), вікно ШІ та Anki.",
+      prRowSuite: "<b>Все в одному (Комбайн).</b> Читалка і перекладач запускаються разом в одному процесі. Кнопка «⚔️ Translate» у читалці миттєво викликає перекладач.",
+      prNote: "💡 <b>Порада:</b> Якщо вам потрібен повний досвід — запускайте <code>m_reader_t.exe</code>. Якщо ви читаєте в браузері — запустіть лише <code>m_translate.exe</code>.",
+      qsTitle: "⚡ Швидкий старт за 3 простих кроки",
+      qsS1H: "Розпакуйте та запустіть",
+      qsS1P: "Витягніть файли з ZIP-архіву в будь-яку зручну папку на ПК (Робочий стіл, диск D: або флешка) і запустіть потрібний .exe файл.",
+      qsS2H: "Відкрийте бібліотеку або Хмарне сховище",
+      qsS2P: "У читалці перейдіть у вкладку «Хмарне сховище» для онлайн-читання або у «TG Завантажувач» для збереження манхви на комп'ютер у власну папку library.",
+      qsS3H: "Перекладайте за допомогою значка чи хоткею",
+      qsS3P: "Клікніть по плаваючому неоновому значку 文 / A або затисніть гарячі клавіші для миттєвого захоплення тексту з екрана.",
+      qsAlert: "📌 <b>Чистота системи:</b> Додатки не засмічують реєстр Windows і не створюють прихованих системних служб. Всі завантажені манхви залишаються поруч із програмою.",
+      hkTitle: "⌨️ Гарячі клавіші та навігація",
+      thHkKey: "Комбінація клавіш",
+      thHkAct: "Дія",
+      thHkMod: "Де діє",
+      hkR1: "Відкрити / приховати вікно перекладу",
+      hkM1: "Усі програми",
+      hkR2: "<b>Захоплення слова з екрана:</b> виділіть прямокутник мишею для розпізнавання тексту",
+      hkM2: "Усі програми",
+      hkR3: "<b>Захоплення цілого речення</b> для створення картки в Anki",
+      hkM3: "Усі програми",
+      hkR4: "<b>Вирізання арту:</b> збереження красивого кадру з манхви на картку",
+      hkM4: "Усі програми",
+      hkR5: "<b>Zen Mode:</b> приховати/показати панель керування читалки",
+      hkM5: "Читалка",
+      hkR6: "Увімкнути / вимкнути повноекранний режим читання",
+      hkM6: "Читалка",
+      hkR7: "Плавне гортання глави вниз",
+      hkM7: "Читалка",
+      aaTitle: "🤖 Налаштування ШІ Gemini та карток Anki",
+      aaAiH: "✨ Власний ключ Gemini AI (Безкоштовно)",
+      aaAiP: "Щоб використовувати розумного асистента без обмежень, перейдіть на <b>aistudio.google.com</b>, натисніть <i>«Create API Key»</i> (це повністю безкоштовно) та вставте його у <b>Налаштування ➔ AI Gemini</b> у перекладачі. Ваш ключ зберігається лише на вашому ПК.",
+      aaAnkiH: "🗂️ Синхронізація з Anki",
+      aaAnkiP: "Встановіть програму Anki на ПК та плагін <b>AnkiConnect</b> (код: <code>2055492159</code>). Додаток сам знайде підключення, створить красиву колоду «англ манхва» з темною темою або дозволить експортувати картки файлом .apkg.",
+      aaTip: "💡 <b>Мова відповідей ШІ:</b> У налаштуваннях перекладача ви можете окремо вибрати, якою мовою ШІ пояснюватиме граматику та ідіоми (Українська, English чи Русский).",
+      sfTitle: "🛡️ Безпека, Приватність & Дисклеймер",
+      sfPrivH: "🔒 100% Локальна приватність:",
+      sfPrivP: "Нейромережа розпізнавання тексту (OCR) працює <b>повністю офлайн на вашому процесорі</b>. Ваші скріншоти та текст нікуди не відправляються. Запити до ШІ здійснюються напряму між вашим комп'ютером та серверами Google за вашим персональним ключем.",
+      sfDiscH: "⚠️ Дисклеймер (Відмова від відповідальності):",
+      sfDiscP: "Цей програмний комплекс розроблений <b>виключно для некомерційного використання, особистого читання та освітніх цілей</b> (вивчення іноземних мов). Усі авторські права на манхву, арт та оригінальні твори належать їхнім авторам та видавництвам. Додаток не розміщує піратський контент і виступає виключно як персональний інструмент перегляду документів та читання.",
+      footer: "M_Translate & Manhwa Reader Ecosystem • Version 1.0 • 2026"
+    },
+    en: {
+      hdrBadge: "🚀 Version 1.0 Portable • Dark Fantasy Edition",
+      hdrTitle: "<span class='gold'>M_Translate</span> & <span class='cyan'>Manhwa Reader</span>",
+      hdrSub: "Comprehensive standalone ecosystem for reading original manhwas, instant overlay screen translation, AI language learning, and 1-click Anki card creation.",
+      tabOverview: "🌟 What is this?",
+      tabPrograms: "📦 Which app to choose?",
+      tabQuickstart: "⚡ Quick Start",
+      tabHotkeys: "⌨️ Hotkeys",
+      tabAiAnki: "🤖 AI & Anki",
+      tabSafety: "🛡️ Safety & Disclaimer",
+      ovTitle: "🌟 Why was this project created?",
+      ovDesc: "The primary goal is to turn reading your favorite manhwas into an engaging, rapid, and effortless way to learn foreign languages without alt-tabbing to dictionary websites.",
+      ovC1H: "📖 Seamless Reading (Webtoon)",
+      ovC1P: "Smooth vertical scrolling without white lines or gaps, seamless long strips, supporting both PDF and JPEG chapters.",
+      ovC2H: "⚡ Instant In-Game Translation",
+      ovC2P: "Capture words or sentences right from the screen with hotkeys — an elegant Dark Fantasy comic bubble pops up instantly.",
+      ovC3H: "🧠 AI Slang & Idiom Breakdown",
+      ovC3P: "Gemini AI analyzes subtle context, character idioms, cultural nuances, and grammar breakdown beyond literal translation.",
+      ovC4H: "⭐ 2-Second Anki Flashcards",
+      ovC4P: "Save target words along with the sentence and cropped panel art directly into Anki for spaced repetition memory retention.",
+      prTitle: "📦 Three Portable Apps — Choose Yours",
+      prSub: "All programs are 100% portable single-file executables — no Python or installation required.",
+      thPrName: "File (.exe)",
+      thPrSize: "Size",
+      thPrDesc: "Included features and target audience",
+      prRowReader: "<b>Reader & Cloud Only.</b> Perfect if you only want to read webtoons, download chapters from Telegram, or stream from the cloud vault without translation.",
+      prRowTrans: "<b>Overlay Translator Only.</b> Works over ANY application (browser, games, readers). Packs offline RapidOCR, AI Chat, and Anki creator.",
+      prRowSuite: "<b>All-in-One Suite.</b> Both reader and overlay translator run together in a unified process. The '⚔️ Translate' toolbar button summons the overlay.",
+      prNote: "💡 <b>Tip:</b> For the complete all-in-one experience, launch <code>m_reader_t.exe</code>. If you read in Chrome, just run <code>m_translate.exe</code>.",
+      qsTitle: "⚡ Quick Start in 3 Easy Steps",
+      qsS1H: "Extract and Run",
+      qsS1P: "Extract files from the ZIP archive to any directory on your PC (Desktop, disk D:, or flash drive) and run the desired .exe.",
+      qsS2H: "Open Library or Cloud Vault",
+      qsS2P: "In the reader, switch to 'Cloud Vault' for instant streaming, or use 'TG Downloader' to save chapters locally into your library.",
+      qsS3H: "Translate with Mascot or Hotkeys",
+      qsS3P: "Click the floating neon badge 文 / A or use hotkeys to snip any word or dialogue box on screen.",
+      qsAlert: "📌 <b>Clean Architecture:</b> The apps do not modify the Windows registry or create background services. Everything stays in your local folder.",
+      hkTitle: "⌨️ Keyboard Shortcuts & Navigation",
+      thHkKey: "Key Combination",
+      thHkAct: "Action",
+      thHkMod: "Scope",
+      hkR1: "Show / Hide translation bubble window",
+      hkM1: "Global",
+      hkR2: "<b>Word OCR Snip:</b> draw a rectangle with mouse to capture word",
+      hkM2: "Global",
+      hkR3: "<b>Sentence OCR Snip:</b> capture sentence context for Anki",
+      hkM3: "Global",
+      hkR4: "<b>Panel Art Crop:</b> crop beautiful manhwa panel art for flashcard",
+      hkM4: "Global",
+      hkR5: "<b>Zen Mode:</b> toggle toolbar visibility for distraction-free reading",
+      hkM5: "Reader",
+      hkR6: "Toggle Fullscreen mode",
+      hkM6: "Reader",
+      hkR7: "Smooth scroll down",
+      hkM7: "Reader",
+      aaTitle: "🤖 Gemini AI & Anki Configuration",
+      aaAiH: "✨ Free Gemini API Key",
+      aaAiP: "To unlock the AI assistant, visit <b>aistudio.google.com</b>, generate a free API key, and paste it into <b>Settings ➔ AI Gemini</b> in M_Translate. Your key is stored strictly on your local PC.",
+      aaAnkiH: "🗂️ Anki Integration",
+      aaAnkiP: "Run desktop Anki with the <b>AnkiConnect</b> add-on (code: <code>2055492159</code>). The app will automatically connect, create the deck, and sync styled cards.",
+      aaTip: "💡 <b>AI Response Language:</b> In settings, you can choose which language Gemini uses for grammar explanations (Ukrainian, English, or Russian).",
+      sfTitle: "🛡️ Safety, Privacy & Disclaimer",
+      sfPrivH: "🔒 100% Local Privacy:",
+      sfPrivP: "The text recognition engine (OCR) runs <b>entirely offline on your CPU</b>. Your screen clips are never uploaded. AI calls travel directly between your machine and Google endpoints using your personal key.",
+      sfDiscH: "⚠️ Disclaimer:",
+      sfDiscP: "This software suite is developed <b>exclusively for non-commercial personal use, educational purposes, and foreign language learning</b>. All manhwa copyrights, artwork, and trademarks belong to their respective authors and publishers.",
+      footer: "M_Translate & Manhwa Reader Ecosystem • Version 1.0 • 2026"
+    },
+    ru: {
+      hdrBadge: "🚀 Версия 1.0 Portable • Dark Fantasy Edition",
+      hdrTitle: "<span class='gold'>M_Translate</span> & <span class='cyan'>Manhwa Reader</span>",
+      hdrSub: "Автономная экосистема для чтения манхвы в оригинале, экранного оверлейного перевода, изучения языка с ИИ и создания карточек Anki в один клик.",
+      tabOverview: "🌟 Зачем это нужно?",
+      tabPrograms: "📦 Какую программу выбрать?",
+      tabQuickstart: "⚡ Быстрый старт",
+      tabHotkeys: "⌨️ Горячие клавиши",
+      tabAiAnki: "🤖 ИИ и Anki",
+      tabSafety: "🛡️ Безопасность и отказ",
+      ovTitle: "🌟 Зачем создан этот проект?",
+      ovDesc: "Главная цель — превратить чтение любимой манхвы в увлекательный, быстрый и эффективный способ изучения языка без переключения на сторонние сайты переводчиков.",
+      ovC1H: "📖 Удобное чтение (Webtoon)",
+      ovC1P: "Плавная вертикальная прокрутка без белых швов, цельное полотно глав, поддержка PDF и JPEG.",
+      ovC2H: "⚡ Перевод без отрыва от чтения",
+      ovC2P: "Выделите слово или фразу прямо с экрана горячей клавишей — поверх манхвы появится комикс-бабл с переводом.",
+      ovC3H: "🧠 Разбор сленга и идиом через ИИ",
+      ovC3P: "ИИ объясняет контекст, игру слов, грамматические обороты и тонкости фраз персонажей.",
+      ovC4H: "⭐ Карточки в Anki за 2 секунды",
+      ovC4P: "Сохраняйте слово вместе с предложением и кадром манхвы в свою память интервальных повторений.",
+      prTitle: "📦 Три автономные версии — Выберите свою",
+      prSub: "Все программы полностью портативны — им не нужен установленный Python или сторонние библиотеки.",
+      thPrName: "Файл (.exe)",
+      thPrSize: "Размер",
+      thPrDesc: "Что внутри и для кого",
+      prRowReader: "<b>Только Читалка и Облако.</b> Идеально, если вам нужно просто читать вебтуны, скачивать главы из Telegram или стримить манхву без переводчика.",
+      prRowTrans: "<b>Только Экранный Переводчик.</b> Работает поверх ЛЮБЫХ программ (браузера, читалок, игр). Содержит офлайн OCR-распознавание, окно ИИ и Anki.",
+      prRowSuite: "<b>Всё в одном (Комбайн).</b> Читалка и переводчик запускаются вместе в одном процессе. Кнопка «⚔️ Translate» сразу вызывает переводчик.",
+      prNote: "💡 <b>Совет:</b> Для полного набора возможностей запускайте <code>m_reader_t.exe</code>. Если читаете в браузере — запустите <code>m_translate.exe</code>.",
+      qsTitle: "⚡ Быстрый старт за 3 шага",
+      qsS1H: "Распакуйте и запустите",
+      qsS1P: "Извлеките файлы из ZIP-архива в любую папку на ПК (Рабочий стол, диск D:, флешка) и запустите нужный .exe.",
+      qsS2H: "Откройте библиотеку или Облачное хранилище",
+      qsS2P: "В читалке перейдите во вкладку «Облачное хранилище» для чтения онлайн или используйте загрузчик для сохранения в library.",
+      qsS3H: "Переводите по значку или клавишам",
+      qsS3P: "Нажмите на плавающий значок 文 / A или зажмите горячие клавиши для мгновенного захвата текста с экрана.",
+      qsAlert: "📌 <b>Чистота системы:</b> Программы не трогают реестр Windows и не создают служб. Все скачанные файлы остаются рядом с программой.",
+      hkTitle: "⌨️ Горячие клавиши и навигация",
+      thHkKey: "Сочетание клавиш",
+      thHkAct: "Действие",
+      thHkMod: "Где действует",
+      hkR1: "Открыть / скрыть окно перевода",
+      hkM1: "Все программы",
+      hkR2: "<b>Захват слова с экрана:</b> выделите прямоугольник мышью для распознавания",
+      hkM2: "Все программы",
+      hkR3: "<b>Захват целого предложения</b> для создания карточки в Anki",
+      hkM3: "Все программы",
+      hkR4: "<b>Вырезка арта:</b> сохранение красивого кадра манхвы на карточку",
+      hkM4: "Все программы",
+      hkR5: "<b>Zen Mode:</b> скрыть/показать панель читалки",
+      hkM5: "Читалка",
+      hkR6: "Полноэкранный режим чтения",
+      hkM6: "Читалка",
+      hkR7: "Плавная прокрутка главы вниз",
+      hkM7: "Читалка",
+      aaTitle: "🤖 Настройка Gemini ИИ и Anki",
+      aaAiH: "✨ Бесплатный ключ Gemini API",
+      aaAiP: "Для работы ИИ перейдите на <b>aistudio.google.com</b>, нажмите <i>«Create API Key»</i> (это бесплатно) и вставьте его в <b>Настройки ➔ AI Gemini</b>. Ключ хранится только на вашем ПК.",
+      aaAnkiH: "🗂️ Синхронизация с Anki",
+      aaAnkiP: "Запустите Anki на ПК с плагином <b>AnkiConnect</b> (код: <code>2055492159</code>). Приложение само подключится, создаст колоду «англ манхва» и сохранит карточки.",
+      aaTip: "💡 <b>Язык ответов ИИ:</b> В настройках можно выбрать, на каком языке ИИ объясняет грамматику (Украинский, English или Русский).",
+      sfTitle: "🛡️ Безопасность, Приватность и Отказ",
+      sfPrivH: "🔒 100% Локальная приватность:",
+      sfPrivP: "Распознавание текста (OCR) работает <b>полностью офлайн на вашем процессоре</b>. Ваши скриншоты никуда не отправляются. Запросы к ИИ идут напрямую между вашим ПК и серверами Google по вашему личному ключу.",
+      sfDiscH: "⚠️ Отказ от ответственности:",
+      sfDiscP: "Программный комплекс создан <b>исключительно для личного некоммерческого использования и изучения иностранных языков</b>. Все авторские права на манхву и арт принадлежат их авторам и издательствам.",
+      footer: "M_Translate & Manhwa Reader Ecosystem • Version 1.0 • 2026"
+    }
+  };
+
+  function setLang(lang) {
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    const d = i18n[lang];
+    if (!d) return;
+
+    document.getElementById('hdr-badge').innerText = d.hdrBadge;
+    document.getElementById('hdr-title').innerHTML = d.hdrTitle;
+    document.getElementById('hdr-sub').innerText = d.hdrSub;
+
+    document.getElementById('tab-btn-overview').innerText = d.tabOverview;
+    document.getElementById('tab-btn-programs').innerText = d.tabPrograms;
+    document.getElementById('tab-btn-quickstart').innerText = d.tabQuickstart;
+    document.getElementById('tab-btn-hotkeys').innerText = d.tabHotkeys;
+    document.getElementById('tab-btn-ai_anki').innerText = d.tabAiAnki;
+    document.getElementById('tab-btn-safety').innerText = d.tabSafety;
+
+    document.getElementById('ov-title').innerText = d.ovTitle;
+    document.getElementById('ov-desc').innerText = d.ovDesc;
+    document.getElementById('ov-c1-h').innerText = d.ovC1H;
+    document.getElementById('ov-c1-p').innerText = d.ovC1P;
+    document.getElementById('ov-c2-h').innerText = d.ovC2H;
+    document.getElementById('ov-c2-p').innerText = d.ovC2P;
+    document.getElementById('ov-c3-h').innerText = d.ovC3H;
+    document.getElementById('ov-c3-p').innerText = d.ovC3P;
+    document.getElementById('ov-c4-h').innerText = d.ovC4H;
+    document.getElementById('ov-c4-p').innerText = d.ovC4P;
+
+    document.getElementById('pr-title').innerText = d.prTitle;
+    document.getElementById('pr-sub').innerText = d.prSub;
+    document.getElementById('th-pr-name').innerText = d.thPrName;
+    document.getElementById('th-pr-size').innerText = d.thPrSize;
+    document.getElementById('th-pr-desc').innerText = d.thPrDesc;
+    document.getElementById('pr-row-reader').innerHTML = d.prRowReader;
+    document.getElementById('pr-row-trans').innerHTML = d.prRowTrans;
+    document.getElementById('pr-row-suite').innerHTML = d.prRowSuite;
+    document.getElementById('pr-note').innerHTML = d.prNote;
+
+    document.getElementById('qs-title').innerText = d.qsTitle;
+    document.getElementById('qs-s1-h').innerText = d.qsS1H;
+    document.getElementById('qs-s1-p').innerText = d.qsS1P;
+    document.getElementById('qs-s2-h').innerText = d.qsS2H;
+    document.getElementById('qs-s2-p').innerText = d.qsS2P;
+    document.getElementById('qs-s3-h').innerText = d.qsS3H;
+    document.getElementById('qs-s3-p').innerText = d.qsS3P;
+    document.getElementById('qs-alert').innerHTML = d.qsAlert;
+
+    document.getElementById('hk-title').innerText = d.hkTitle;
+    document.getElementById('th-hk-key').innerText = d.thHkKey;
+    document.getElementById('th-hk-act').innerText = d.thHkAct;
+    document.getElementById('th-hk-mod').innerText = d.thHkMod;
+    document.getElementById('hk-r1').innerText = d.hkR1;
+    document.getElementById('hk-m1').innerText = d.hkM1;
+    document.getElementById('hk-r2').innerHTML = d.hkR2;
+    document.getElementById('hk-m2').innerText = d.hkM2;
+    document.getElementById('hk-r3').innerHTML = d.hkR3;
+    document.getElementById('hk-m3').innerText = d.hkM3;
+    document.getElementById('hk-r4').innerHTML = d.hkR4;
+    document.getElementById('hk-m4').innerText = d.hkM4;
+    document.getElementById('hk-r5').innerHTML = d.hkR5;
+    document.getElementById('hk-m5').innerText = d.hkM5;
+    document.getElementById('hk-r6').innerText = d.hkR6;
+    document.getElementById('hk-m6').innerText = d.hkM6;
+    document.getElementById('hk-r7').innerText = d.hkR7;
+    document.getElementById('hk-m7').innerText = d.hkM7;
+
+    document.getElementById('aa-title').innerText = d.aaTitle;
+    document.getElementById('aa-ai-h').innerText = d.aaAiH;
+    document.getElementById('aa-ai-p').innerHTML = d.aaAiP;
+    document.getElementById('aa-anki-h').innerText = d.aaAnkiH;
+    document.getElementById('aa-anki-p').innerHTML = d.aaAnkiP;
+    document.getElementById('aa-tip').innerHTML = d.aaTip;
+
+    document.getElementById('sf-title').innerText = d.sfTitle;
+    document.getElementById('sf-priv-h').innerText = d.sfPrivH;
+    document.getElementById('sf-priv-p').innerHTML = d.sfPrivP;
+    document.getElementById('sf-disc-h').innerText = d.sfDiscH;
+    document.getElementById('sf-disc-p').innerText = d.sfDiscP;
+
+    document.getElementById('footer-text').innerText = d.footer;
+  }
+
+  function openTab(tabName) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    const target = document.getElementById('tab-' + tabName);
+    if (target) target.classList.add('active');
+
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(btn => {
+      if (btn.getAttribute('onclick').includes(tabName)) {
+        btn.classList.add('active');
+      }
+    });
+  }
+</script>
+
+</body>
+</html>

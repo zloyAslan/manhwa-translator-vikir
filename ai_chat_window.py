@@ -4,7 +4,7 @@ Features:
 - ChatGPT / Claude style multi-session management (each conversation isolated)
 - Session switcher with full message history restoration
 - Text insertion without auto-sending (waits for user's Enter or button click)
-- Messenger layout (User on right, Vikir AI on left)
+- Messenger layout (User on right, M_Translate AI on left)
 - Movable anywhere on screen by dragging header/frame
 - 2-message split for sentence analysis: Translation + Idiom breakdown
 - Strict 1-step token-efficient context for follow-up questions
@@ -23,6 +23,8 @@ from PyQt6.QtWidgets import (
 import pyperclip
 
 from ai_service import AIService
+from config import config
+from localization import tr
 
 AI_BG_MAIN = "#090B10"
 AI_BG_CARD = "#121622"
@@ -113,11 +115,11 @@ class ChatMessageBubble(QFrame):
             btn_row.setContentsMargins(0, 4, 0, 0)
             btn_row.setSpacing(8)
 
-            copy_btn = QPushButton("📋 Копіювати")
-            copy_btn.setFont(QFont("Segoe UI", 8))
-            copy_btn.setFixedHeight(22)
-            copy_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            copy_btn.setStyleSheet("""
+            self.copy_btn = QPushButton(tr("ai_bubble_copy_btn", config.ui_lang))
+            self.copy_btn.setFont(QFont("Segoe UI", 8))
+            self.copy_btn.setFixedHeight(22)
+            self.copy_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            self.copy_btn.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(255, 255, 255, 0.05);
                     color: #94A3B8;
@@ -130,14 +132,14 @@ class ChatMessageBubble(QFrame):
                     background-color: rgba(255, 255, 255, 0.12);
                 }
             """)
-            copy_btn.clicked.connect(self.copy_content)
-            btn_row.addWidget(copy_btn)
+            self.copy_btn.clicked.connect(self.copy_content)
+            btn_row.addWidget(self.copy_btn)
 
-            anki_btn = QPushButton("⭐ В Anki")
-            anki_btn.setFont(QFont("Segoe UI Black", 8))
-            anki_btn.setFixedHeight(22)
-            anki_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            anki_btn.setStyleSheet("""
+            self.anki_btn = QPushButton(tr("ai_bubble_anki_btn", config.ui_lang))
+            self.anki_btn.setFont(QFont("Segoe UI Black", 8))
+            self.anki_btn.setFixedHeight(22)
+            self.anki_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            self.anki_btn.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(245, 158, 11, 0.15);
                     color: #FBBF24;
@@ -151,8 +153,8 @@ class ChatMessageBubble(QFrame):
                     color: #000000;
                 }
             """)
-            anki_btn.clicked.connect(self.send_to_anki)
-            btn_row.addWidget(anki_btn)
+            self.anki_btn.clicked.connect(self.send_to_anki)
+            btn_row.addWidget(self.anki_btn)
 
             btn_row.addStretch()
             layout.addLayout(btn_row)
@@ -177,13 +179,20 @@ class ChatMessageBubble(QFrame):
 
     def copy_content(self):
         pyperclip.copy(self.raw_text)
-        self.toast_signal.emit("Текст скопійовано!")
+        self.toast_signal.emit(tr("ai_copied_toast", config.ui_lang))
 
     def send_to_anki(self):
         first_line = self.raw_text.split("\n")[0].strip()
         word = self.sentence_context or first_line
         trans = self.raw_text
         self.anki_requested.emit(word, trans, self.sentence_context)
+
+    def retranslate_ui(self):
+        ul = config.ui_lang
+        if hasattr(self, "copy_btn"):
+            self.copy_btn.setText(tr("ai_bubble_copy_btn", ul))
+        if hasattr(self, "anki_btn"):
+            self.anki_btn.setText(tr("ai_bubble_anki_btn", ul))
 
 
 class AIChatWindow(QWidget):
@@ -238,7 +247,7 @@ class AIChatWindow(QWidget):
         top_bar = QHBoxLayout()
         top_bar.setSpacing(6)
 
-        self.title_lbl = QLabel("⚔️ ВІКІР AI")
+        self.title_lbl = QLabel(tr("ai_window_title_base", config.ui_lang))
         self.title_lbl.setFont(QFont("Segoe UI Black", 10))
         self.title_lbl.setStyleSheet("color: #F59E0B; background: transparent;")
         top_bar.addWidget(self.title_lbl)
@@ -246,8 +255,8 @@ class AIChatWindow(QWidget):
         top_bar.addStretch()
 
         # "+ Новий" Chat Button
-        self.new_chat_btn = QPushButton("＋ Новий")
-        self.new_chat_btn.setToolTip("Почати новий окремий розбір (новий чат)")
+        self.new_chat_btn = QPushButton(tr("ai_new_chat_btn", config.ui_lang))
+        self.new_chat_btn.setToolTip(tr("ai_new_chat_tooltip", config.ui_lang))
         self.new_chat_btn.setFont(QFont("Segoe UI Black", 8))
         self.new_chat_btn.setFixedHeight(24)
         self.new_chat_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -269,8 +278,8 @@ class AIChatWindow(QWidget):
         top_bar.addWidget(self.new_chat_btn)
 
         # "💬 Сесії" Dropdown Button
-        self.sessions_btn = QPushButton("💬 Сесії (0)")
-        self.sessions_btn.setToolTip("Список збережених діалогів цієї сесії")
+        self.sessions_btn = QPushButton(tr("ai_sessions_btn", config.ui_lang, count=0))
+        self.sessions_btn.setToolTip(tr("ai_sessions_tooltip", config.ui_lang))
         self.sessions_btn.setFont(QFont("Segoe UI Black", 8))
         self.sessions_btn.setFixedHeight(24)
         self.sessions_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -291,8 +300,8 @@ class AIChatWindow(QWidget):
         top_bar.addWidget(self.sessions_btn)
 
         # Exit application button '⏻ Вийти'
-        self.exit_btn = QPushButton("⏻ Вийти")
-        self.exit_btn.setToolTip("Повністю закрити перекладач")
+        self.exit_btn = QPushButton(tr("exit_btn", config.ui_lang))
+        self.exit_btn.setToolTip(tr("exit_tooltip", config.ui_lang))
         self.exit_btn.setFont(QFont("Segoe UI Black", 8))
         self.exit_btn.setFixedHeight(24)
         self.exit_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -315,7 +324,7 @@ class AIChatWindow(QWidget):
 
         # Close button '✕'
         close_btn = QLabel("✕")
-        close_btn.setToolTip("Сховати вікно AI")
+        close_btn.setToolTip(tr("ai_close_tooltip", config.ui_lang))
         close_btn.setFixedSize(24, 24)
         close_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
         close_btn.setFont(QFont("Segoe UI Black", 10))
@@ -388,7 +397,7 @@ class AIChatWindow(QWidget):
         layout.addWidget(self.scroll_area, stretch=1)
 
         # 3. Typing indicator label
-        self.typing_lbl = QLabel("АІ Вікір пише...")
+        self.typing_lbl = QLabel(tr("ai_typing", config.ui_lang))
         self.typing_lbl.setFont(QFont("Segoe UI", 9, italic=True))
         self.typing_lbl.setStyleSheet("color: #94A3B8; font-style: italic; background: transparent; padding-left: 6px;")
         self.typing_lbl.hide()
@@ -401,7 +410,7 @@ class AIChatWindow(QWidget):
         self.chat_input = QTextEdit()
         self.chat_input.setFixedHeight(50)
         self.chat_input.setFont(QFont("Segoe UI", 10))
-        self.chat_input.setPlaceholderText("Введіть або відредагуйте текст (Enter для надсилання)...")
+        self.chat_input.setPlaceholderText(tr("ai_input_placeholder", config.ui_lang))
         self.chat_input.setStyleSheet("""
             QTextEdit {
                 background-color: #121622;
@@ -446,33 +455,66 @@ class AIChatWindow(QWidget):
         QTimer.singleShot(2000, self.toast_lbl.hide)
 
     def clear_messages_ui(self):
-        """Removes all rendered message bubbles from the layout."""
-        while self.messages_layout.count() > 1:
-            item = self.messages_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                while item.layout().count():
-                    child = item.layout().takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
+        """Cleanly wipes out all message rows by replacing the messages container."""
+        old_container = self.messages_container
+        if old_container:
+            old_container.setParent(None)
+            old_container.deleteLater()
+
+        self.messages_container = QWidget()
+        self.messages_container.setStyleSheet("background: transparent; border: none;")
+        self.messages_layout = QVBoxLayout(self.messages_container)
+        self.messages_layout.setContentsMargins(4, 4, 4, 4)
+        self.messages_layout.setSpacing(10)
+        self.messages_layout.addStretch()
+
+        self.scroll_area.setWidget(self.messages_container)
+        self.scroll_area.update()
 
     def update_sessions_button_text(self):
         count = len(self.sessions)
-        self.sessions_btn.setText(f"💬 Сесії ({count})")
+        self.sessions_btn.setText(tr("ai_sessions_btn", config.ui_lang, count=count))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.retranslate_ui()
+
+    def retranslate_ui(self):
+        """Refreshes all visible text and controls when UI language changes."""
+        ul = config.ui_lang
+        if not self.current_session:
+            self.title_lbl.setText(tr("ai_window_title_new", ul))
+        else:
+            self.title_lbl.setText(f"⚔️ {self.current_session.title}")
+        self.new_chat_btn.setText(tr("ai_new_chat_btn", ul))
+        self.new_chat_btn.setToolTip(tr("ai_new_chat_tooltip", ul))
+        self.exit_btn.setText(tr("exit_btn", ul))
+        self.exit_btn.setToolTip(tr("exit_tooltip", ul))
+        self.typing_lbl.setText(tr("ai_typing", ul))
+        self.chat_input.setPlaceholderText(tr("ai_input_placeholder", ul))
+        self.update_sessions_button_text()
+
+        if self.current_session is None:
+            self.clear_messages_ui()
+            self.render_ai_bubble(
+                tr("ai_welcome_text", ul),
+                badge="🗡️ " + tr("app_title", ul).replace("⚔️ ", "").replace("⚡ ", "")
+            )
+        else:
+            for bubble in self.findChildren(ChatMessageBubble):
+                bubble.retranslate_ui()
 
     def start_new_chat(self, show_welcome: bool = True):
         """Starts a clean, new chat session."""
         self.current_session = None
         self.clear_messages_ui()
-        self.title_lbl.setText("⚔️ ВІКІР AI • НОВИЙ РОЗБІР")
+        self.title_lbl.setText(tr("ai_window_title_new", config.ui_lang))
         self.update_sessions_button_text()
 
         if show_welcome:
             self.render_ai_bubble(
-                "Привіт! Я Вікір. Введіть речення або питання знизу та натисніть Enter (або ➤).\n"
-                "Я надам точний український художній переклад та розберу приховані ідіоми.",
-                badge="🗡️ ВІКІР"
+                tr("ai_welcome_text", config.ui_lang),
+                badge="🗡️ " + tr("app_title", config.ui_lang).replace("⚔️ ", "").replace("⚡ ", "")
             )
 
     def render_user_bubble(self, text: str):
@@ -480,19 +522,24 @@ class AIChatWindow(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.addStretch()
 
-        bubble = ChatMessageBubble(text, is_user=True)
+        bubble = ChatMessageBubble(text, is_user=True, parent=self.messages_container)
         bubble.toast_signal.connect(self.show_toast)
         bubble.setMaximumWidth(int(self.width() * 0.82))
         row.addWidget(bubble)
 
         self.messages_layout.insertLayout(self.messages_layout.count() - 1, row)
+        self.messages_layout.activate()
+        self.messages_container.adjustSize()
         self.scroll_to_bottom()
 
-    def render_ai_bubble(self, text: str, badge: str = "⚔️ ВІКІР", sentence_ctx: str = ""):
+    def render_ai_bubble(self, text: str, badge: Optional[str] = None, sentence_ctx: str = ""):
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
 
-        bubble = ChatMessageBubble(text, is_user=False, badge=badge, sentence_context=sentence_ctx)
+        if badge is None:
+            badge = "⚡ " + tr("app_title", config.ui_lang).replace("⚔️ ", "").replace("⚡ ", "")
+
+        bubble = ChatMessageBubble(text, is_user=False, badge=badge, sentence_context=sentence_ctx, parent=self.messages_container)
         bubble.toast_signal.connect(self.show_toast)
         bubble.anki_requested.connect(self.open_anki_dialog_signal.emit)
         bubble.setMaximumWidth(int(self.width() * 0.88))
@@ -500,10 +547,12 @@ class AIChatWindow(QWidget):
         row.addStretch()
 
         self.messages_layout.insertLayout(self.messages_layout.count() - 1, row)
+        self.messages_layout.activate()
+        self.messages_container.adjustSize()
         self.scroll_to_bottom()
 
     def scroll_to_bottom(self):
-        QTimer.singleShot(60, lambda: self.scroll_area.verticalScrollBar().setValue(
+        QTimer.singleShot(50, lambda: self.scroll_area.verticalScrollBar().setValue(
             self.scroll_area.verticalScrollBar().maximum()
         ))
 
@@ -512,6 +561,7 @@ class AIChatWindow(QWidget):
         Pre-fills the chat input with the given text WITHOUT auto-sending.
         Allows the user to review/edit before pressing Enter.
         """
+        self.retranslate_ui()
         self.show()
         self.raise_()
         self.activateWindow()
@@ -587,12 +637,17 @@ class AIChatWindow(QWidget):
         self.current_session.previous_ai_response = f"{translation}\n{explanation}".strip()
 
         if translation:
-            self.current_session.add_message("ai", f"«{translation}»", badge="📖 ХУДОЖНІЙ ПЕРЕКЛАД", sentence_context=self.current_session.sentence)
-            self.render_ai_bubble(f"«{translation}»", badge="📖 ХУДОЖНІЙ ПЕРЕКЛАД", sentence_ctx=self.current_session.sentence)
+            badge_trans = tr("ai_badge_art_trans", config.ui_lang)
+            self.current_session.add_message("ai", f"«{translation}»", badge=badge_trans, sentence_context=self.current_session.sentence)
+            self.render_ai_bubble(f"«{translation}»", badge=badge_trans, sentence_ctx=self.current_session.sentence)
 
         if explanation:
-            self.current_session.add_message("ai", explanation, badge="🔍 РОЗБІР ІДІОМ ТА СТРУКТУРИ", sentence_context=self.current_session.sentence)
-            self.render_ai_bubble(explanation, badge="🔍 РОЗБІР ІДІОМ ТА СТРУКТУРИ", sentence_ctx=self.current_session.sentence)
+            badge_expl = tr("ai_badge_idiom_expl", config.ui_lang)
+            self.current_session.add_message("ai", explanation, badge=badge_expl, sentence_context=self.current_session.sentence)
+            self.render_ai_bubble(explanation, badge=badge_expl, sentence_ctx=self.current_session.sentence)
+
+        QApplication.processEvents()
+        self.scroll_to_bottom()
 
     def on_followup_received(self, answer: str):
         self.typing_lbl.hide()
@@ -602,16 +657,19 @@ class AIChatWindow(QWidget):
             return
 
         self.current_session.previous_ai_response = answer
-        self.current_session.add_message("ai", answer, badge="💬 ВІКІР", sentence_context=self.current_session.sentence)
-        self.render_ai_bubble(answer, badge="💬 ВІКІР", sentence_ctx=self.current_session.sentence)
+        self.current_session.add_message("ai", answer, badge="💬 " + tr("app_title", config.ui_lang).replace("⚔️ ", ""), sentence_context=self.current_session.sentence)
+        self.render_ai_bubble(answer, badge="💬 " + tr("app_title", config.ui_lang).replace("⚔️ ", ""), sentence_ctx=self.current_session.sentence)
+        QApplication.processEvents()
+        self.scroll_to_bottom()
 
     def on_ai_error(self, err: str):
         self.typing_lbl.hide()
         self.send_btn.setEnabled(True)
-        err_msg = f"⚠️ Помилка Gemini: {err}"
+        err_msg = tr("ai_error_gemini", config.ui_lang, error=err)
+        badge_err = tr("ai_badge_error", config.ui_lang)
         if self.current_session:
-            self.current_session.add_message("ai", err_msg, badge="⚠️ ПОМИЛКА")
-        self.render_ai_bubble(err_msg, badge="⚠️ ПОМИЛКА")
+            self.current_session.add_message("ai", err_msg, badge=badge_err)
+        self.render_ai_bubble(err_msg, badge=badge_err)
 
     def switch_to_session(self, session: ChatSession):
         """Switches completely to the selected past conversation (restoring history)."""
@@ -626,19 +684,22 @@ class AIChatWindow(QWidget):
             else:
                 self.render_ai_bubble(
                     m.get("text", ""),
-                    badge=m.get("badge", "⚔️ ВІКІР"),
+                    badge=m.get("badge", "⚔️ " + tr("app_title", config.ui_lang).replace("⚔️ ", "")),
                     sentence_ctx=m.get("sentence_context", "")
                 )
 
+        self.messages_layout.activate()
+        self.messages_container.adjustSize()
+        QApplication.processEvents()
         self.scroll_to_bottom()
         self.chat_input.clear()
         self.chat_input.setFocus()
-        self.show_toast(f"Відкрито сесію: {session.title[:25]}...")
+        self.show_toast(tr("ai_session_opened_toast", config.ui_lang, title=session.title[:25]))
 
     def clear_all_sessions(self):
         self.sessions.clear()
         self.start_new_chat(show_welcome=True)
-        self.show_toast("Всі сесії очищено!")
+        self.show_toast(tr("ai_sessions_cleared_toast", config.ui_lang))
 
     def show_sessions_menu(self):
         """Displays distinct previous sessions to switch between, like ChatGPT."""
@@ -667,25 +728,26 @@ class AIChatWindow(QWidget):
         """)
 
         # Option: New Chat
-        act_new = menu.addAction("➕ Почати новий розбір")
+        act_new = menu.addAction(tr("ai_sessions_new_action", config.ui_lang))
         act_new.triggered.connect(lambda: self.start_new_chat(show_welcome=True))
         menu.addSeparator()
 
         if not self.sessions:
-            act_empty = menu.addAction("(Немає збережених сесій)")
+            act_empty = menu.addAction(tr("ai_sessions_empty", config.ui_lang))
             act_empty.setEnabled(False)
         else:
             for s in reversed(self.sessions):
                 msg_count = len(s.messages)
                 is_active = (self.current_session and self.current_session.session_id == s.session_id)
                 prefix = "▶ " if is_active else "💬 "
-                title_preview = f"{prefix}{s.title} ({msg_count} пов.)"
+                msg_txt = tr("ai_msg_count", config.ui_lang, count=msg_count)
+                title_preview = f"{prefix}{s.title} ({msg_txt})"
 
                 act = menu.addAction(title_preview)
                 act.triggered.connect(lambda checked, target=s: self.switch_to_session(target))
 
             menu.addSeparator()
-            act_clear = menu.addAction("🗑️ Очистити всі сесії")
+            act_clear = menu.addAction(tr("ai_sessions_clear_all", config.ui_lang))
             act_clear.triggered.connect(self.clear_all_sessions)
 
         menu.exec(QCursor.pos())

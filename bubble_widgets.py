@@ -1,8 +1,8 @@
 """
-Comic Speech Bubble and Response Cloud Widgets for Manhwa Translator.
+Comic Speech Bubble and Response Cloud Widgets for M_Translate.
 Features:
-- Dark Fantasy Theme (Screenshot 2: #090B10, #121622, amber/blue/mint gradient)
-- Horizontally aligned speech tail pointing directly into Vikir's face
+- Dark Fantasy Theme (#090B10, #121622, amber/blue/mint gradient)
+- Horizontally aligned speech tail pointing directly into M_Translate badge
 - Zero white backgrounds / strips
 - Integration with robust audio service
 """
@@ -17,6 +17,8 @@ from PyQt6.QtWidgets import (
     QPushButton, QFrame, QScrollArea, QGraphicsDropShadowEffect
 )
 from audio_service import speak_english
+from config import config
+from localization import tr
 
 # Dark Fantasy Palette matching user's reference
 BG_MAIN = QColor("#090B10")
@@ -32,7 +34,7 @@ TEXT_MUTED = QColor("#9CA3AF")
 class ComicBubbleFrame(QWidget):
     """
     A widget that paints a dark fantasy dialogue balloon with rounded corners,
-    a glowing gradient top border, and an authentic comic speech tail pointing at Vikir.
+    a glowing gradient top border, and an authentic comic speech tail pointing at M_Translate badge.
     """
     def __init__(self, parent=None, tail_position="left_mid"):
         super().__init__(parent)
@@ -77,7 +79,7 @@ class ComicBubbleFrame(QWidget):
 
         tail_path = QPainterPath()
         if self.tail_position == "left_mid":
-            # Point tail straight horizontally at Vikir's cheek/shoulder (y around 45..75)
+            # Point tail straight horizontally at M_Translate badge (y around 45..75)
             base_y1 = rect_y + 38.0
             base_y2 = rect_y + 66.0
             kink_x = rect_x - 12.0
@@ -165,7 +167,7 @@ class ComicCloudCard(QFrame):
 
         header_layout.addStretch()
 
-        copy_hint = QLabel("📋 Клік щоб скопіювати")
+        copy_hint = QLabel(tr("copy_hint", config.ui_lang))
         copy_hint.setFont(QFont("Segoe UI", 8))
         copy_hint.setStyleSheet("color: #64748B;")
         header_layout.addWidget(copy_hint)
@@ -282,7 +284,7 @@ class ComicArticleCard(QFrame):
 
         top_row.addStretch()
 
-        anki_mini_btn = QPushButton("⭐ В Anki")
+        anki_mini_btn = QPushButton(tr("ai_bubble_anki_btn", config.ui_lang))
         anki_mini_btn.setFont(QFont("Segoe UI Black", 8))
         anki_mini_btn.setFixedHeight(22)
         anki_mini_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -381,7 +383,7 @@ class ComicInputHeader(QWidget):
 
         # Text input
         self.line_edit = QLineEdit()
-        self.line_edit.setPlaceholderText("Введіть слово англійською (Enter для перекладу)...")
+        self.line_edit.setPlaceholderText(tr("input_placeholder", config.ui_lang))
         self.line_edit.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
         self.line_edit.setStyleSheet("""
             QLineEdit {
@@ -403,7 +405,7 @@ class ComicInputHeader(QWidget):
 
         # Voice pronunciation button 🔊
         self.voice_btn = QPushButton("🔊")
-        self.voice_btn.setToolTip("Озвучити англійською (Вимова)")
+        self.voice_btn.setToolTip(tr("voice_tooltip", config.ui_lang))
         self.voice_btn.setFixedSize(36, 36)
         self.voice_btn.setFont(QFont("Segoe UI Emoji", 12))
         self.voice_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -422,8 +424,8 @@ class ComicInputHeader(QWidget):
         layout.addWidget(self.voice_btn)
 
         # OCR Screen Lens button 📷 Alt+E
-        self.ocr_btn = QPushButton("📷 Alt+E")
-        self.ocr_btn.setToolTip("Захопити слово з екрана манхви [Alt+E]")
+        self.ocr_btn = QPushButton(tr("ocr_btn", config.ui_lang))
+        self.ocr_btn.setToolTip(tr("ocr_tooltip", config.ui_lang))
         self.ocr_btn.setFixedHeight(36)
         self.ocr_btn.setFont(QFont("Segoe UI Black", 9))
         self.ocr_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -446,7 +448,7 @@ class ComicInputHeader(QWidget):
 
         # Translate button ➜
         self.submit_btn = QPushButton("➜")
-        self.submit_btn.setToolTip("Перекласти (Enter)")
+        self.submit_btn.setToolTip(tr("submit_tooltip", config.ui_lang))
         self.submit_btn.setFont(QFont("Segoe UI Black", 12))
         self.submit_btn.setFixedSize(36, 36)
         self.submit_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))

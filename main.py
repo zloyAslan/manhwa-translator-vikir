@@ -1,7 +1,7 @@
 """
-Main Application Entry Point for Manhwa Translator Overlay (Dark Fantasy Edition).
+Main Application Entry Point for M_Translate Manhwa Overlay Translator (Dark Fantasy Edition).
 Coordinates:
-- Floating Vikir Mascot
+- Floating M_Translate Vector Neon Mascot Badge
 - Streamlined Comic Bubble Window
 - Anki Card Creator Modal (AnkiConnect ports 8766/8765, deck 'англ манхва')
 - RapidOCR Word Capture (Alt+E / F12)
@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 import keyboard
 import pyperclip
 
-from config import Config
+from config import config, Config
 from dictionary_service import DictionaryService
 from anki_service import AnkiService
 from chibi_mascot import ChibiMascot
@@ -30,6 +30,7 @@ from ocr_snipper import SnippingOverlay
 from anki_dialog import AnkiCardDialog
 from panel_cropper import PanelCropper
 from ai_chat_window import AIChatWindow
+from localization import tr
 
 ASSETS_DIR = Path(__file__).parent
 
@@ -45,7 +46,7 @@ class HotkeySignal(QObject):
 
 class ManhwaTranslatorApp:
     def __init__(self):
-        self.app = QApplication(sys.argv)
+        self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
 
         icon_path = ASSETS_DIR / "app_icon.ico"
@@ -55,7 +56,7 @@ class ManhwaTranslatorApp:
         else:
             self.app_icon = QIcon()
 
-        self.config = Config()
+        self.config = config
         self.dict_service = DictionaryService()
         self.anki_service = AnkiService()
 
@@ -78,6 +79,7 @@ class ManhwaTranslatorApp:
         self.bubble_window.ocr_word_requested.connect(lambda: self.start_ocr("word"))
         self.bubble_window.open_anki_dialog_signal.connect(self.open_anki_dialog)
         self.bubble_window.open_ai_chat_signal.connect(self.on_open_ai_chat)
+        self.bubble_window.ui_language_changed.connect(self.on_ui_language_changed)
         self.history_window.word_selected.connect(self.translate_from_history)
 
         # Connect AI dialog signals
@@ -108,7 +110,13 @@ class ManhwaTranslatorApp:
 
     def setup_tray(self):
         self.tray = QSystemTrayIcon(self.app_icon, self.app)
-        self.tray.setToolTip("⚔️ Манхва Перекладач (Вікір)")
+        self.setup_tray_menu()
+        self.tray.activated.connect(self.on_tray_activated)
+        self.tray.show()
+
+    def setup_tray_menu(self):
+        ul = self.config.get("ui_lang", "uk")
+        self.tray.setToolTip(tr("tray_tooltip", ul))
 
         tray_menu = QMenu()
         tray_menu.setFont(QFont("Segoe UI", 9))
@@ -129,38 +137,47 @@ class ManhwaTranslatorApp:
             }
         """)
 
-        act_word_ocr = tray_menu.addAction("📷 Захопити слово (Alt+E)")
+        act_word_ocr = tray_menu.addAction(tr("tray_word_ocr", ul))
         act_word_ocr.triggered.connect(lambda: self.start_ocr("word"))
 
-        act_sent_ocr = tray_menu.addAction("📝 Захопити речення для Anki (Alt+W)")
+        act_sent_ocr = tray_menu.addAction(tr("tray_sent_ocr", ul))
         act_sent_ocr.triggered.connect(lambda: self.start_ocr("sentence"))
 
-        act_panel_crop = tray_menu.addAction("🖼️ Захопити арт у картку (Alt+D)")
+        act_panel_crop = tray_menu.addAction(tr("tray_panel_crop", ul))
         act_panel_crop.triggered.connect(self.start_panel_cropper)
 
-        act_blank_anki = tray_menu.addAction("🎴 Створити порожню картку (Alt+S)")
+        act_blank_anki = tray_menu.addAction(tr("tray_blank_anki", ul))
         act_blank_anki.triggered.connect(self.on_open_blank_anki)
 
-        act_ai = tray_menu.addAction("🤖 ШІ-розбір речень та ідіом (Alt+A)")
+        act_ai = tray_menu.addAction(tr("tray_ai", ul))
         act_ai.triggered.connect(self.on_ai_hotkey)
 
-        act_show = tray_menu.addAction("💬 Відкрити перекладач (Alt+Q)")
+        act_show = tray_menu.addAction(tr("tray_show", ul))
         act_show.triggered.connect(self.toggle_bubble)
 
-        act_hist = tray_menu.addAction("📖 Словник та картки Anki")
+        act_hist = tray_menu.addAction(tr("tray_dict", ul))
         act_hist.triggered.connect(self.open_history)
 
-        act_reset = tray_menu.addAction("🎯 Центрувати Вікіра на екрані")
+        act_reset = tray_menu.addAction(tr("tray_center", ul))
         act_reset.triggered.connect(self.center_mascot)
 
         tray_menu.addSeparator()
 
-        act_exit = tray_menu.addAction("❌ Вийти з програми (Повне закриття)")
+        act_exit = tray_menu.addAction(tr("tray_exit", ul))
         act_exit.triggered.connect(self.quit_app)
 
         self.tray.setContextMenu(tray_menu)
-        self.tray.activated.connect(self.on_tray_activated)
-        self.tray.show()
+
+    def on_ui_language_changed(self, lang: str):
+        self.setup_tray_menu()
+        if hasattr(self, "bubble_window"):
+            self.bubble_window.retranslate_ui()
+        if hasattr(self, "ai_window"):
+            self.ai_window.retranslate_ui()
+        if hasattr(self, "anki_dialog"):
+            self.anki_dialog.retranslate_ui()
+        if hasattr(self, "history_window"):
+            self.history_window.retranslate_ui()
 
     def on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:

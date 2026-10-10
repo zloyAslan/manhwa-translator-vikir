@@ -1,6 +1,7 @@
 """
 Dictionary and Translation Service for Manhwa Overlay Translator.
-Provides rich English-to-Ukrainian translations with parts of speech, synonyms, definitions, and IPA.
+Provides rich multilingual translations (EN, UK, RU, AUTO) with parts of speech,
+synonyms, definitions, and IPA transcription.
 """
 
 import sys
@@ -10,20 +11,17 @@ import requests
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
+from config import Config
+from localization import (
+    POS_TRANSLATIONS_BY_LANG,
+    get_pos_translation,
+    tr
+)
+
 DB_PATH = Path(__file__).parent / "cache.db"
 
-POS_TRANSLATIONS = {
-    "noun": "ІМЕННИК (Noun)",
-    "verb": "ДІЄСЛОВО (Verb)",
-    "adjective": "ПРИКМЕТНИК (Adjective)",
-    "adverb": "ПРИСЛІВНИК (Adverb)",
-    "pronoun": "ЗАЙМЕННИК (Pronoun)",
-    "preposition": "ПРИЙМЕННИК (Preposition)",
-    "conjunction": "СПОЛУЧНИК (Conjunction)",
-    "interjection": "ВИГУК (Interjection)",
-    "phrase": "ФРАЗА (Phrase)",
-    "idiom": "ІДІОМА (Idiom)",
-}
+# Backward compatibility export for UK POS mapping
+POS_TRANSLATIONS = POS_TRANSLATIONS_BY_LANG["uk"]
 
 # Common fantasy / manhwa collocation hints for richer context cards
 MANHWA_COLLOCATIONS = {
@@ -39,9 +37,11 @@ MANHWA_COLLOCATIONS = {
     "hunter": ["monster hunter (мисливець на монстрів)", "rank hunter (ранговий мисливець)", "guild (гільдія)"],
 }
 
+
 class DictionaryService:
-    def __init__(self, db_path: Path = DB_PATH):
+    def __init__(self, db_path: Path = DB_PATH, config: Optional[Config] = None):
         self.db_path = db_path
+        self.config = config or Config()
         self._init_db()
 
     def _init_db(self):
@@ -66,32 +66,53 @@ class DictionaryService:
         except Exception as e:
             print(f"DB Init Error: {e}")
 
-    def get_cached(self, word: str) -> Optional[Dict[str, Any]]:
+    def get_cached(self, word: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> Optional[Dict[str, Any]]:
         clean = word.strip().lower()
+        sl = source_lang or self.config.get("source_lang", "en")
+        tl = target_lang or self.config.get("target_lang", "uk")
+        key = f"{sl}:{tl}:{clean}"
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT data FROM cache WHERE word = ?", (clean,))
+                cursor.execute("SELECT data FROM cache WHERE word = ?", (key,))
                 row = cursor.fetchone()
                 if row:
                     return json.loads(row[0])
+
+                # Backward compatibility for legacy default en->uk cache entries
+                if sl == "en" and tl == "uk":
+                    cursor.execute("SELECT data FROM cache WHERE word = ?", (clean,))
+                    row_legacy = cursor.fetchone()
+                    if row_legacy:
+                        return json.loads(row_legacy[0])
         except Exception as e:
             print(f"Cache get error: {e}")
         return None
 
-    def save_cached(self, word: str, data: Dict[str, Any]):
+    def save_cached(self, word: str, data: Dict[str, Any], source_lang: Optional[str] = None, target_lang: Optional[str] = None):
         clean = word.strip().lower()
+        sl = source_lang or self.config.get("source_lang", "en")
+        tl = target_lang or self.config.get("target_lang", "uk")
+        key = f"{sl}:{tl}:{clean}"
+
         main_trans = data.get("main", "").strip()
-        # NEVER cache failed translations where translation is empty or matches raw English text
+        # NEVER cache failed translations where translation is empty or matches raw input
         if not main_trans or (main_trans.lower() == clean and any(c.isascii() and c.isalpha() for c in clean)):
             return
 
         try:
             with sqlite3.connect(self.db_path) as conn:
+                payload = json.dumps(data, ensure_ascii=False)
                 conn.execute(
                     "INSERT OR REPLACE INTO cache (word, data) VALUES (?, ?)",
-                    (clean, json.dumps(data, ensure_ascii=False))
+                    (key, payload)
                 )
+                if sl == "en" and tl == "uk":
+                    conn.execute(
+                        "INSERT OR REPLACE INTO cache (word, data) VALUES (?, ?)",
+                        (clean, payload)
+                    )
                 conn.execute(
                     "INSERT INTO history (word, main_trans) VALUES (?, ?)",
                     (clean, main_trans)
@@ -121,11 +142,15 @@ class DictionaryService:
         except Exception as e:
             print(f"Clear history error: {e}")
 
-    def _fetch_fallback_translate(self, text: str) -> str:
+    def _fetch_fallback_translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
         """Fallback translation via MyMemory API when primary Google request has issues."""
+        sl = source_lang or self.config.get("source_lang", "en")
+        tl = target_lang or self.config.get("target_lang", "uk")
+        pair_sl = "autodetect" if sl == "auto" else sl
+
         try:
             url = "https://api.mymemory.translated.net/get"
-            params = {"q": text, "langpair": "en|uk"}
+            params = {"q": text, "langpair": f"{pair_sl}|{tl}"}
             resp = requests.get(url, params=params, timeout=3.5)
             if resp.status_code == 200:
                 data = resp.json()
@@ -136,36 +161,54 @@ class DictionaryService:
             print(f"Fallback translate error: {e}")
         return ""
 
-    def lookup(self, text: str) -> Dict[str, Any]:
+    def lookup(
+        self,
+        text: str,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+        ui_lang: Optional[str] = None
+    ) -> Dict[str, Any]:
         clean_text = text.strip()
         if not clean_text:
             return {"error": "Порожній запит"}
 
-        # Check cache first (ignore bad cached entries where translation is identical to query)
-        cached = self.get_cached(clean_text)
+        sl = source_lang or self.config.get("source_lang", "en")
+        tl = target_lang or self.config.get("target_lang", "uk")
+        ul = ui_lang or self.config.get("ui_lang", "uk")
+
+        # Check cache first
+        cached = self.get_cached(clean_text, source_lang=sl, target_lang=tl)
         if cached:
             c_main = cached.get("main", "").strip()
             if c_main and (c_main.lower() != clean_text.lower() or not any(c.isascii() and c.isalpha() for c in clean_text)):
                 return cached
 
-        # Fetch Google Translate Single API
-        gt_data = self._fetch_google_dict(clean_text)
+        # Fetch Google Translate Single API with configured languages
+        gt_data = self._fetch_google_dict(clean_text, source_lang=sl, target_lang=tl)
 
-        # Quick attempt to fetch Free Dictionary API only for single words
+        # Quick attempt to fetch Free Dictionary API only for single English words
         dict_data = None
-        if " " not in clean_text and len(clean_text) < 30:
+        if sl in ("en", "auto") and " " not in clean_text and len(clean_text) < 30:
             dict_data = self._fetch_free_dictionary(clean_text)
 
-        result = self._format_result(clean_text, gt_data, dict_data)
-        self.save_cached(clean_text, result)
+        result = self._format_result(clean_text, gt_data, dict_data, source_lang=sl, target_lang=tl, ui_lang=ul)
+        self.save_cached(clean_text, result, source_lang=sl, target_lang=tl)
         return result
 
-    def _fetch_google_dict(self, text: str) -> Dict[str, Any]:
+    def _fetch_google_dict(
+        self,
+        text: str,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None
+    ) -> Dict[str, Any]:
+        sl = source_lang or self.config.get("source_lang", "en")
+        tl = target_lang or self.config.get("target_lang", "uk")
+
         url = "https://translate.googleapis.com/translate_a/single"
         params = {
             "client": "gtx",
-            "sl": "en",
-            "tl": "uk",
+            "sl": sl,
+            "tl": tl,
             "dt": ["t", "bd", "rm", "ss", "ex", "md"],
             "dj": "1",
             "q": text,
@@ -193,7 +236,15 @@ class DictionaryService:
             pass
         return None
 
-    def _format_result(self, original_text: str, gt_data: Dict[str, Any], dict_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _format_result(
+        self,
+        original_text: str,
+        gt_data: Dict[str, Any],
+        dict_data: Optional[Dict[str, Any]],
+        source_lang: str = "en",
+        target_lang: str = "uk",
+        ui_lang: str = "uk"
+    ) -> Dict[str, Any]:
         main_trans = ""
         translit = ""
 
@@ -205,9 +256,9 @@ class DictionaryService:
                     if "src_translit" in s and s["src_translit"] and not translit:
                         translit = s["src_translit"]
 
-        # If primary translation failed or returned the exact same English text:
+        # If primary translation failed or returned the exact same text when alphabetic:
         if not main_trans or (main_trans.strip().lower() == original_text.strip().lower() and any(c.isascii() and c.isalpha() for c in original_text)):
-            fallback_trans = self._fetch_fallback_translate(original_text)
+            fallback_trans = self._fetch_fallback_translate(original_text, source_lang=source_lang, target_lang=target_lang)
             if fallback_trans:
                 main_trans = fallback_trans
 
@@ -230,7 +281,7 @@ class DictionaryService:
         if "dict" in gt_data and isinstance(gt_data["dict"], list):
             for d in gt_data["dict"]:
                 pos_raw = d.get("pos", "").lower()
-                pos_title = POS_TRANSLATIONS.get(pos_raw, pos_raw.upper())
+                pos_title = get_pos_translation(pos_raw, target_lang=target_lang)
                 terms = d.get("terms", [])
                 entries = []
                 for entry in d.get("entry", []):
@@ -254,7 +305,7 @@ class DictionaryService:
         # ==========================================
         cloud_1 = {
             "type": "main",
-            "badge": "★ ГОЛОВНИЙ ПЕРЕКЛАД",
+            "badge": tr("cloud_main_badge", lang=ui_lang),
             "title": main_trans,
             "phonetic": f"/{phonetic}/" if phonetic else "",
             "quick_copy": main_trans,
@@ -298,10 +349,9 @@ class DictionaryService:
                     cloud_3["details"].append(f"{e['word']} ({', '.join(e['reverse'][:3])})")
             clouds.append(cloud_3)
         elif all_synonyms_set:
-            # Synonyms cloud in English
             cloud_3 = {
                 "type": "synonyms",
-                "badge": "🔄 АНГЛІЙСЬКІ СИНОНІМИ",
+                "badge": tr("cloud_synonyms_badge", lang=ui_lang),
                 "terms": list(all_synonyms_set)[:6],
                 "details": []
             }
@@ -311,7 +361,7 @@ class DictionaryService:
             defs = [d["definition"] for d in m.get("definitions", [])[:2] if "definition" in d]
             cloud_3 = {
                 "type": "definition",
-                "badge": "📖 ЗНАЧЕННЯ АНГЛІЙСЬКОЮ",
+                "badge": tr("cloud_definitions_badge", lang=ui_lang),
                 "terms": defs[:2],
                 "details": []
             }
@@ -323,10 +373,10 @@ class DictionaryService:
         lower_word = original_text.lower().strip()
         custom_hints = MANHWA_COLLOCATIONS.get(lower_word)
 
-        if custom_hints:
+        if custom_hints and target_lang == "uk":
             clouds.append({
                 "type": "manhwa",
-                "badge": "🗡️ У МАНХВІ ТА КОМІКСАХ",
+                "badge": tr("cloud_manhwa_badge", lang=ui_lang),
                 "terms": custom_hints[:4],
                 "details": []
             })
@@ -339,7 +389,6 @@ class DictionaryService:
                 "details": []
             })
         elif dict_data and dict_data.get("meanings"):
-            # Check for examples
             examples = []
             for m in dict_data["meanings"]:
                 for d in m.get("definitions", []):
@@ -348,16 +397,16 @@ class DictionaryService:
             if examples:
                 clouds.append({
                     "type": "example",
-                    "badge": "💡 ПРИКЛАД ВЖИВАННЯ",
+                    "badge": tr("cloud_example_badge", lang=ui_lang),
                     "terms": examples[:2],
                     "details": []
                 })
 
-        # If we still have fewer than 3 clouds, and there's phrase or synonym data:
+        # If we still have fewer than 3 clouds, and there's synonym data:
         if len(clouds) < 3 and all_synonyms_set:
             clouds.append({
                 "type": "synonyms",
-                "badge": "🔄 СИНОНІМИ (EN)",
+                "badge": tr("cloud_synonyms_badge", lang=ui_lang),
                 "terms": list(all_synonyms_set)[:5],
                 "details": []
             })
@@ -367,7 +416,7 @@ class DictionaryService:
             words = [w.strip() for w in original_text.split() if len(w.strip()) > 1][:4]
             breakdown = []
             for w in words:
-                sub_cached = self.get_cached(w)
+                sub_cached = self.get_cached(w, source_lang=source_lang, target_lang=target_lang)
                 if sub_cached:
                     breakdown.append(f"{w} = {sub_cached.get('main', '')}")
                 else:
@@ -375,7 +424,7 @@ class DictionaryService:
             if breakdown:
                 clouds.append({
                     "type": "breakdown",
-                    "badge": "🧩 СЛОВА У ВИРАЗІ",
+                    "badge": tr("cloud_breakdown_badge", lang=ui_lang),
                     "terms": breakdown,
                     "details": []
                 })
@@ -384,8 +433,11 @@ class DictionaryService:
         if len(clouds) < 3:
             clouds.append({
                 "type": "tip",
-                "badge": "💡 ПОРАДА",
-                "terms": ["Натисніть на будь-яку хмаринку, щоб скопіювати переклад!", "Enter або клік для швидкого перекладу"],
+                "badge": tr("cloud_tip_badge", lang=ui_lang),
+                "terms": [
+                    tr("cloud_tip_term_1", lang=ui_lang),
+                    tr("cloud_tip_term_2", lang=ui_lang)
+                ],
                 "details": []
             })
 
@@ -397,7 +449,13 @@ class DictionaryService:
             "clouds": clouds[:4]
         }
 
-    def get_word_article(self, text: str) -> Dict[str, Any]:
+    def get_word_article(
+        self,
+        text: str,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+        ui_lang: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Builds a rich learner's dictionary article (Oxford/Cambridge style)
         with headword, phonetic, parts of speech, definitions, examples, 
@@ -407,8 +465,14 @@ class DictionaryService:
         if not clean_text:
             return {"query": text, "cards": []}
 
-        gt_data = self._fetch_google_dict(clean_text)
+        sl = source_lang or self.config.get("source_lang", "en")
+        tl = target_lang or self.config.get("target_lang", "uk")
+        ul = ui_lang or self.config.get("ui_lang", "uk")
+
+        gt_data = self._fetch_google_dict(clean_text, source_lang=sl, target_lang=tl)
         dict_data = None
+        if sl in ("en", "auto"):
+            dict_data = self._fetch_free_dictionary(clean_text)
 
         phonetic = ""
         if "sentences" in gt_data and isinstance(gt_data["sentences"], list):
@@ -418,13 +482,13 @@ class DictionaryService:
                     break
 
         # Collect Google POS translations
-        pos_ukr_map = {}
+        pos_terms_map = {}
         if "dict" in gt_data and isinstance(gt_data["dict"], list):
             for d in gt_data["dict"]:
                 p = d.get("pos", "").lower()
                 terms = d.get("terms", [])
                 if terms:
-                    pos_ukr_map[p] = terms[:4]
+                    pos_terms_map[p] = terms[:4]
 
         # Parse Google Oxford definitions
         defs_by_pos = {}
@@ -439,7 +503,7 @@ class DictionaryService:
                     if gloss:
                         item = f"• {gloss}"
                         if ex:
-                            item += f"<br>&nbsp;&nbsp;↳ <i>Приклад: \"{ex}\"</i>"
+                            item += f"<br>&nbsp;&nbsp;↳ <i>{tr('cloud_article_example', lang=ul)}\"{ex}\"</i>"
                         pos_entries.append(item)
                 if pos_entries:
                     defs_by_pos[pos] = pos_entries
@@ -455,30 +519,24 @@ class DictionaryService:
                     if d_text:
                         item = f"• {d_text}"
                         if ex:
-                            item += f"<br>&nbsp;&nbsp;↳ <i>Приклад: \"{ex}\"</i>"
+                            item += f"<br>&nbsp;&nbsp;↳ <i>{tr('cloud_article_example', lang=ul)}\"{ex}\"</i>"
                         top_defs.append(item)
                 if top_defs:
                     defs_by_pos[pos] = top_defs
 
-        # Phonetic transcription
-        phonetic = ""
-        if "sentences" in gt_data:
-            for s in gt_data["sentences"]:
-                if s.get("src_translit"):
-                    phonetic = s["src_translit"]
-                    break
+        # Phonetic transcription fallback
         if not phonetic and dict_data:
             phonetic = dict_data.get("phonetic", "")
 
         cards = []
-        # Build cards for each POS present in Google dict or definitions
-        all_pos_keys = list(dict.fromkeys(list(pos_ukr_map.keys()) + list(defs_by_pos.keys())))
+        all_pos_keys = list(dict.fromkeys(list(pos_terms_map.keys()) + list(defs_by_pos.keys())))
         for pos in all_pos_keys:
-            pos_ukr = POS_TRANSLATIONS.get(pos, pos.upper())
-            ukr_terms = pos_ukr_map.get(pos, [])
+            pos_label = get_pos_translation(pos, target_lang=tl)
+            terms = pos_terms_map.get(pos, [])
             top_defs = defs_by_pos.get(pos, [])
-            if not top_defs and ukr_terms:
-                top_defs = [f"• Значення: {', '.join(ukr_terms[:4])}"]
+            if not top_defs and terms:
+                meaning_prefix = tr("cloud_article_meaning", lang=ul)
+                top_defs = [f"{meaning_prefix}{', '.join(terms[:4])}"]
 
             forms = []
             if pos == "verb":
@@ -494,9 +552,9 @@ class DictionaryService:
                 forms = [f"adv: {clean_text}ly", f"-er: {clean_text}er", f"-est: {clean_text}est"]
 
             card_data = {
-                "badge": f"📖 {pos.upper()} • {pos_ukr}",
+                "badge": f"📖 {pos.upper()} • {pos_label}",
                 "title": f"{clean_text} {f'/{phonetic}/' if phonetic else ''}",
-                "translation": ", ".join(ukr_terms) if ukr_terms else "",
+                "translation": ", ".join(terms) if terms else "",
                 "definitions": top_defs[:3],
                 "forms": forms,
                 "synonyms": [],
@@ -506,13 +564,14 @@ class DictionaryService:
             cards.append(card_data)
 
         if not cards:
-            main_res = self.lookup(clean_text)
+            main_res = self.lookup(clean_text, source_lang=sl, target_lang=tl, ui_lang=ul)
             main_t = main_res.get("main", "")
+            trans_prefix = tr("cloud_article_trans", lang=ul)
             cards.append({
-                "badge": "📖 СЛОВНИКОВА СТАТТЯ",
+                "badge": tr("cloud_article_badge", lang=ul),
                 "title": f"{clean_text} {f'/{phonetic}/' if phonetic else ''}",
                 "translation": main_t,
-                "definitions": [f"• Переклад: {main_t}"],
+                "definitions": [f"{trans_prefix}{main_t}"],
                 "forms": [f"-ed: {clean_text}ed", f"-ing: {clean_text}ing", f"-s: {clean_text}s"],
                 "synonyms": [],
                 "word": clean_text,
@@ -524,4 +583,3 @@ class DictionaryService:
             "phonetic": phonetic,
             "cards": cards
         }
-
