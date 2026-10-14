@@ -12,31 +12,32 @@
 | **Читалка (Engine)** | `PyMuPDF` (`fitz`), `Pillow` (PIL) | Рендеринг довгих вертикальних PDF-файлів вебтунів, розбивка на тайли, обробка зображень |
 | **Хмара та Завантажувач** | `aiohttp`, `telethon` (Telegram MTProto client) | Завантаження розділів манхви з каналів Telegram та стрімінг із хмарного індексу |
 | **Системні перехоплювачі** | `keyboard`, `pyperclip`, `pywin32` | Глобальні системні гарячі клавіші (Windows LL hooks), робота з буфером обміну, системні атрибути вікон |
-| **Аудіо (Вимова)** | `pygame` / нативний Windows Audio мікшер | Озвучення вимови слів безпосередньо у вибраний аудіо-пристрій |
+| **Аудіо (Вимова)** | `edge-tts` (Microsoft Azure Neural) + `winmm` MCI API / `winsound` | Студійний нейронний синтез мовлення (SK ViktoriaNeural) з регулюванням швидкості та фоновим програванням без підвисання UI |
 
 ---
 
 ## 2. Загальна схема архітектури компонентів
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        ГОЛОВНІ ВХІДНІ ТОЧКИ                            │
-│  main.py (M_Translate)  │  reader.py (Reader)  │  suite_main.py (Обидва)│
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │
-           ┌─────────────────────────┴─────────────────────────┐
-           ▼                                                   ▼
-┌──────────────────────────────────────┐    ┌───────────────────────────────────┐
-│     МОДУЛЬ ОВЕРЛЕЙНОГО ПЕРЕКЛАДУ     │    │      МОДУЛЬ ЧИТАЛКИ (MANHWA)      │
-├──────────────────────────────────────┤    ├───────────────────────────────────┤
-│ • MascotBadge / ChibiMascot          │    │ • Reader Window (PyQt6 Scroll)    │
-│ • BubbleWindow (Comic Frame)         │    │ • Webtoon Vertical Strip Layout   │
-│ • SnippingOverlay (RapidOCR)         │    │ • PDF / Image Tile Renderer       │
-│ • PanelCropper (Кадрування 16:10)    │    │ • Cloud Stream Client             │
-│ • AnkiCardDialog (Створення картки)  │    │ • TG Master Downloader (Telethon) │
-│ • AIChatWindow (Gemini Assistant)    │    │ • Zen Mode / Fullscreen (F11/H)   │
-│ • HistoryWindow (Словник / Історія)  │    └───────────────────────────────────┘
-└──────────────────┬───────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 ГОЛОВНІ ВХІДНІ ТОЧКИ                                   │
+│  main.py (M_Translate)  │  reader.py (Reader)  │  suite_main.py (Комбайн Suite)        │
+│  slovak_translator/main.py (Slovak Novel)      │  novel_batch_translator/novel_batch...│
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            │
+           ┌────────────────────────────────┼────────────────────────────────┐
+           ▼                                ▼                                ▼
+┌───────────────────────────────┐ ┌─────────────────────────────────┐ ┌────────────────────────────────┐
+│ МОДУЛЬ ОВЕРЛЕЮ (M_Translate)  │ │      МОДУЛЬ ЧИТАЛКИ (MANHWA)    │ │ СЛОВАЦЬКИЙ ПЕРЕКЛАДАЧ (SK-UK)  │
+├───────────────────────────────┤ ├─────────────────────────────────┤ ├────────────────────────────────┤
+│ • MascotBadge / ChibiMascot   │ │ • Reader Window (PyQt6 Scroll)  │ │ • Frameless Cloud Window (QSS) │
+│ • BubbleWindow (Comic Frame)  │ │ • Webtoon Strip Layout          │ │ • Alt+W Live Text Capture      │
+│ • SnippingOverlay (RapidOCR)  │ │ • PDF / Image Tile Renderer     │ │ • Edge Neural TTS (Viktoria)   │
+│ • PanelCropper (Кадрування)   │ │ • Novel Reader (`novel_reader`) │ │ • IPA Phonetic Transcription   │
+│ • AnkiCardDialog (Арт 16:10)  │ │ • Cloud Stream Client           │ │ • Text-only Anki Cards         │
+│ • AIChatWindow (Gemini)       │ │ • Telegram Downloader + Dedup   │ │ • Gemini Fast Assistant        │
+│ • HistoryWindow (Словник)     │ │ • Zen Mode / Fullscreen (F11/H) │ │ • Isolated SQLite Cache        │
+└───────────────────────────────┘ └─────────────────────────────────┘ └────────────────────────────────┘
                    │
                    ▼
 ┌───────────────────────────────────────────────────────────────────────┐

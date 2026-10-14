@@ -35,9 +35,10 @@
 
 6. [**06_SLOVAK_NOVEL_SYSTEM.md**](file:///d:/всі%20проекти/перекладач/.project_memory/06_SLOVAK_NOVEL_SYSTEM.md)
    - Словацький навчальний напрямок (B1-B2 через читання новел/ранобе).
-   - Читалка новел у `manhwa_reader` (Zen/Dark Mode, прогрес з точністю 0.1%, EPUB/DOCX/TXT).
-   - Консольна утиліта пакетного перекладу глав (Gemini/DeepL) з авто-архівацією в `archive/`.
-   - Окремий полегшений `Slovak Novel Translator` (без OCR, Alt+W для контексту, спрощений Anki, SK->UA).
+   - Читалка новел у `manhwa_reader/novel_reader` (Zen/Dark Mode, прогрес з точністю 0.1%, EPUB/DOCX/TXT).
+   - Консольна утиліта пакетного перекладу глав `novel_batch_translator/` (Gemini/DeepLX).
+   - Окремий полегшений `slovak_translator/` (без OCR, Alt+W для контексту, спрощений Anki з IPA, студійний Edge Neural TTS Viktoria).
+   - Завантажувач глав з Telegram із захистом від дублікатів (Newest/Oldest/All) та постійними сесіями.
 
 ---
 
