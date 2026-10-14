@@ -17,19 +17,27 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
+from pathlib import Path
+_THIS_DIR = str(Path(__file__).parent.resolve())
+_PROJECT_ROOT = str(Path(__file__).parent.parent.resolve())
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+
 import re
 import json
 import asyncio
 import shutil
-from pathlib import Path
+import subprocess
 from typing import List, Dict, Optional, Tuple, Set
 
 from PyQt6.QtCore import (
-    Qt, QThread, pyqtSignal, QTimer, QSize, QPoint, QRect, QRectF
+    Qt, QThread, pyqtSignal, QTimer, QSize, QPoint, QRect, QRectF, QUrl
 )
 from PyQt6.QtGui import (
     QPixmap, QImage, QPainter, QColor, QFont, QIcon, QKeySequence,
-    QLinearGradient, QRadialGradient, QBrush, QCursor, QPalette
+    QLinearGradient, QRadialGradient, QBrush, QCursor, QPalette, QDesktopServices
 )
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -46,14 +54,44 @@ except ImportError:
     except ImportError:
         fitz = None
 
-from downloader import (
-    TelegramManhwaDownloader, extract_chapter_number, clean_channel_link,
-    extract_pdf_to_images, extract_chapter_pdf
-)
+try:
+    from downloader import (
+        TelegramManhwaDownloader, extract_chapter_number, clean_channel_link,
+        extract_pdf_to_images, extract_chapter_pdf
+    )
+    from cloud_stream import (
+        TelegramStreamClient, RollingRAMCache, StreamDownloadThread,
+        load_cloud_index, save_cloud_index
+    )
+except ImportError:
+    from manhwa_reader.downloader import (
+        TelegramManhwaDownloader, extract_chapter_number, clean_channel_link,
+        extract_pdf_to_images, extract_chapter_pdf
+    )
+    from manhwa_reader.cloud_stream import (
+        TelegramStreamClient, RollingRAMCache, StreamDownloadThread,
+        load_cloud_index, save_cloud_index
+    )
 
-BASE_DIR = Path(__file__).parent.resolve()
+try:
+    from manhwa_reader.novel_reader.novel_window import NovelReaderWindow
+except ImportError:
+    try:
+        from novel_reader.novel_window import NovelReaderWindow
+    except ImportError:
+        try:
+            from .novel_reader.novel_window import NovelReaderWindow
+        except Exception:
+            NovelReaderWindow = None
+
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent.resolve()
+else:
+    BASE_DIR = Path(__file__).parent.resolve()
+
 CONFIG_FILE = BASE_DIR / "config.json"
 DEFAULT_LIB_DIR = BASE_DIR / "library"
+DEFAULT_BOT_TOKEN = "8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA"
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +140,8 @@ TRANSLATIONS = {
         "dl_range_ph": "e.g.: 2 or 1-30 or 1 2 (empty = all)",
         "dl_name": "Title Name in Library:",
         "dl_name_ph": "Folder name for manhwa in library",
+        "dl_lang": "Translation Language:",
+        "dl_lang_auto": "Auto-detect",
         "dl_start": "🚀 Start Download",
         "settings_title": "⚙️ Application Settings",
         "lang_lbl": "Interface Language:",
@@ -114,6 +154,9 @@ TRANSLATIONS = {
         "auth_needed": "🟡 Telegram Bot Token Required",
         "toggle_extract_jpeg_title": "Extract to JPEG upon Download",
         "toggle_extract_jpeg_sub": "Converts PDF files into image galleries during download",
+        "toggle_novel_mode_title": "Novel / Light Novel (EPUB / DOCX / TXT)",
+        "toggle_novel_mode_sub": "Save as text novel chapters into dedicated Novel Library",
+        "cat_tab_novels": "📖 Novels / Light Novels",
         "toggle_del_pdf_title": "Delete Original PDF After Extraction",
         "toggle_del_pdf_sub": "Saves disk space after creating JPEG galleries",
         "read_in_jpeg": "🖼️ Read in JPEG",
@@ -168,7 +211,53 @@ TRANSLATIONS = {
         "dl_already_exists_redownload": "⚡ Download Again",
         "dl_already_exists_skip": "Skip Existing",
         "dl_already_exists_cancel": "Cancel",
-        "dl_log_skipped_exists": "Chapter {ch} already exists. Skipping."
+        "dl_log_skipped_exists": "Chapter {ch} already exists. Skipping.",
+        "cat_tab_local": "📚 Local Library",
+        "cat_tab_cloud": "☁️ Cloud Vault",
+        "cloud_vault_title": "Cloud Vault",
+        "cloud_stream_read": "⚡ Read Online",
+        "cloud_empty": "☁️ No titles found in your cloud vault.",
+        "cloud_sync_btn": "🔄 Refresh",
+        "cloud_badge": "CLOUD",
+        "cloud_status_streaming": "⚡ Streaming in RAM (0 bytes on disk)",
+        "cloud_card_dl_btn": "📥 Download",
+        "cloud_card_dl_tooltip": "Download PDF to local library",
+        "cloud_card_chs_word": "chapters",
+        "cloud_card_new": "New",
+        "cloud_dl_dlg_title": "Download PDF",
+        "cloud_dl_dlg_header": "📥 Download Chapter (PDF)",
+        "cloud_dl_total_range": "Total chapters available in vault: {min_ch}–{max_ch} (total {total})",
+        "cloud_dl_total_count": "Total chapters available in vault: {total}",
+        "cloud_dl_folder_lbl": "Save destination (folder name in Library):",
+        "cloud_dl_range_lbl": "Chapter number or range:",
+        "cloud_dl_range_ph": "e.g.: 1 or 1-10 or 1 2 3",
+        "cloud_dl_btn": "📥 Download PDF",
+        "reader_cloud_dl_btn": "📥 Download PDF",
+        "notice_dl_success_title": "Download Complete",
+        "notice_dl_success_btn": "Great",
+        "notice_dl_error_title": "Download Error",
+        "notice_dl_error_btn": "Got it",
+        "cloud_dl_no_chapters": "No chapters found matching filter '{range}'.",
+        "cloud_dl_start_status": "📥 Started downloading {total} chapters to library «{folder}»...",
+        "cloud_dl_chapter_status": "[{idx}/{total}] Downloading Chapter {ch}...",
+        "cloud_dl_saved_pdf": "✓ Chapter {ch} saved as PDF.",
+        "cloud_dl_finish_success": "Successfully downloaded {total} chapters of manhwa «{folder}»!",
+        "search_ph": "🔍 Search titles...",
+        "filter_lang_all": "All Languages",
+        "filter_lang_ua": "🇺🇦 UA",
+        "filter_lang_en": "🇬🇧 EN",
+        "filter_lang_raw": "🌐 RAW",
+        "filter_prog_all": "All Progress",
+        "filter_prog_reading": "📖 Reading",
+        "filter_prog_completed": "✅ Read",
+        "filter_prog_unread": "⏳ Unread",
+        "search_count_lbl": "Showing: {count}",
+        "btn_translate_nav": "⚔️ Translate",
+        "translate_not_found_title": "M_Translate Module Not Found!",
+        "translate_not_found_msg": "You do not have the Translate module installed. Visit our official Telegram channel to download the full version of the application.",
+        "telegram_open_btn": "✈️ Open Telegram Channel",
+        "other_translations_avail": "🌐 Available translations:",
+        "switch_trans_tip": "Switch to {lang} version: {title}"
     },
     "uk": {
         "app_title": "Manhwa Reader AI Drafter",
@@ -212,6 +301,8 @@ TRANSLATIONS = {
         "dl_range_ph": "Наприклад: 2 або 1-30 або 1 2 (порожньо = всі)",
         "dl_name": "Назва тайтлу в бібліотеці:",
         "dl_name_ph": "Назва папки манхви у бібліотеці",
+        "dl_lang": "Мова перекладу тайтлу:",
+        "dl_lang_auto": "Авто-визначення",
         "dl_start": "🚀 Почати завантаження",
         "settings_title": "⚙️ Налаштування програми",
         "lang_lbl": "Мова інтерфейсу:",
@@ -224,6 +315,9 @@ TRANSLATIONS = {
         "auth_needed": "🟡 Потрібен токен бота Telegram",
         "toggle_extract_jpeg_title": "Розпаковувати в JPEG при завантаженні",
         "toggle_extract_jpeg_sub": "Конвертує PDF-файли у галерею зображень під час скачування",
+        "toggle_novel_mode_title": "Новела / Ранобе (EPUB / DOCX / TXT)",
+        "toggle_novel_mode_sub": "Зберігати глави тексту в окрему Бібліотеку Новел для читання",
+        "cat_tab_novels": "📖 Новели / Ранобе",
         "toggle_del_pdf_title": "Видаляти оригінальний PDF після розпаковки",
         "toggle_del_pdf_sub": "Економить місце на диску після створення JPEG-галереї",
         "read_in_jpeg": "🖼️ Читати в JPEG",
@@ -278,7 +372,53 @@ TRANSLATIONS = {
         "dl_already_exists_redownload": "⚡ Завантажити повторно",
         "dl_already_exists_skip": "Пропустити існуючі",
         "dl_already_exists_cancel": "Скасувати",
-        "dl_log_skipped_exists": "Глава {ch} вже існує. Пропуск."
+        "dl_log_skipped_exists": "Глава {ch} вже існує. Пропуск.",
+        "cat_tab_local": "📚 Локальна бібліотека",
+        "cat_tab_cloud": "☁️ Хмарне сховище",
+        "cloud_vault_title": "Хмарне сховище",
+        "cloud_stream_read": "⚡ Читати онлайн",
+        "cloud_empty": "☁️ У вашому хмарному сховищі поки немає збережених глав.",
+        "cloud_sync_btn": "🔄 Оновити",
+        "cloud_badge": "ХМАРА",
+        "cloud_status_streaming": "⚡ Стрімінг у RAM (0 байт на диску)",
+        "cloud_card_dl_btn": "📥 Завантажити",
+        "cloud_card_dl_tooltip": "Завантажити PDF у локальну бібліотеку",
+        "cloud_card_chs_word": "глав",
+        "cloud_card_new": "Нова",
+        "cloud_dl_dlg_title": "Завантажити PDF",
+        "cloud_dl_dlg_header": "📥 Завантажити главу (PDF)",
+        "cloud_dl_total_range": "Всього доступно глав у сховищі: {min_ch}–{max_ch} (всього {total})",
+        "cloud_dl_total_count": "Всього доступно глав у сховищі: {total}",
+        "cloud_dl_folder_lbl": "Куди зберегти (назва папки у Library):",
+        "cloud_dl_range_lbl": "Номер або діапазон глав:",
+        "cloud_dl_range_ph": "Наприклад: 1 або 1-10 або 1 2 3",
+        "cloud_dl_btn": "📥 Завантажити PDF",
+        "reader_cloud_dl_btn": "📥 Завантажити PDF",
+        "notice_dl_success_title": "Завантаження завершено",
+        "notice_dl_success_btn": "Чудово",
+        "notice_dl_error_title": "Помилка завантаження",
+        "notice_dl_error_btn": "Зрозуміло",
+        "cloud_dl_no_chapters": "Не знайдено глав за фільтром '{range}'.",
+        "cloud_dl_start_status": "📥 Розпочато завантаження {total} глав у бібліотеку «{folder}»...",
+        "cloud_dl_chapter_status": "[{idx}/{total}] Завантаження Глави {ch}...",
+        "cloud_dl_saved_pdf": "✓ Глава {ch} збережена як PDF.",
+        "cloud_dl_finish_success": "Успішно завантажено {total} глав манхви «{folder}»!",
+        "search_ph": "🔍 Пошук тайтлів...",
+        "filter_lang_all": "Всі мови",
+        "filter_lang_ua": "🇺🇦 UA",
+        "filter_lang_en": "🇬🇧 EN",
+        "filter_lang_raw": "🌐 RAW",
+        "filter_prog_all": "Весь прогрес",
+        "filter_prog_reading": "📖 Читаю",
+        "filter_prog_completed": "✅ Прочитано",
+        "filter_prog_unread": "⏳ Непочаті",
+        "search_count_lbl": "Знайдено: {count}",
+        "btn_translate_nav": "⚔️ Translate",
+        "translate_not_found_title": "Модуль M_Translate не знайдено!",
+        "translate_not_found_msg": "У вас немає встановленого модуля Translate. Перейдіть до нашого офіційного Telegram-каналу, щоб завантажити повноцінну версію додатку.",
+        "telegram_open_btn": "✈️ Відкрити Telegram-канал",
+        "other_translations_avail": "🌐 Доступні інші переклади:",
+        "switch_trans_tip": "Перейти до {lang} версії: {title}"
     },
     "ru": {
         "app_title": "Manhwa Reader AI Drafter",
@@ -322,6 +462,8 @@ TRANSLATIONS = {
         "dl_range_ph": "Например: 2 или 1-30 или 1 2 (пусто = все)",
         "dl_name": "Название тайтла в библиотеке:",
         "dl_name_ph": "Название папки манхвы в библиотеке",
+        "dl_lang": "Язык перевода тайтла:",
+        "dl_lang_auto": "Авто-определение",
         "dl_start": "🚀 Начать загрузку",
         "settings_title": "⚙️ Настройки программы",
         "lang_lbl": "Язык интерфейса:",
@@ -334,6 +476,9 @@ TRANSLATIONS = {
         "auth_needed": "🟡 Требуется токен бота Telegram",
         "toggle_extract_jpeg_title": "Распаковывать в JPEG при загрузке",
         "toggle_extract_jpeg_sub": "Конвертирует PDF-файлы в галерею изображений во время скачивания",
+        "toggle_novel_mode_title": "Новелла / Ранобэ (EPUB / DOCX / TXT)",
+        "toggle_novel_mode_sub": "Сохранять текстовые главы в отдельную Библиотеку Новелл для чтения",
+        "cat_tab_novels": "📖 Новеллы / Ранобэ",
         "toggle_del_pdf_title": "Удалять исходный PDF после распаковки",
         "toggle_del_pdf_sub": "Экономит место на диске после создания галереи JPEG",
         "read_in_jpeg": "🖼️ Читать в JPEG",
@@ -388,7 +533,53 @@ TRANSLATIONS = {
         "dl_already_exists_redownload": "⚡ Скачать повторно",
         "dl_already_exists_skip": "Пропустить существующие",
         "dl_already_exists_cancel": "Отмена",
-        "dl_log_skipped_exists": "Глава {ch} уже существует. Пропуск."
+        "dl_log_skipped_exists": "Глава {ch} уже существует. Пропуск.",
+        "cat_tab_local": "📚 Локальная библиотека",
+        "cat_tab_cloud": "☁️ Облачное хранилище",
+        "cloud_vault_title": "Облачное хранилище",
+        "cloud_stream_read": "⚡ Читать онлайн",
+        "cloud_empty": "☁️ В вашем облачном хранилище пока нет сохраненных глав.",
+        "cloud_sync_btn": "🔄 Обновить",
+        "cloud_badge": "ОБЛАКО",
+        "cloud_status_streaming": "⚡ Стриминг в RAM (0 байт на диске)",
+        "cloud_card_dl_btn": "📥 Скачать",
+        "cloud_card_dl_tooltip": "Скачать PDF в локальную библиотеку",
+        "cloud_card_chs_word": "глав",
+        "cloud_card_new": "Новая",
+        "cloud_dl_dlg_title": "Скачать PDF",
+        "cloud_dl_dlg_header": "📥 Скачать главу (PDF)",
+        "cloud_dl_total_range": "Всего доступно глав в хранилище: {min_ch}–{max_ch} (всего {total})",
+        "cloud_dl_total_count": "Всего доступно глав в хранилище: {total}",
+        "cloud_dl_folder_lbl": "Куда сохранить (название папки в Library):",
+        "cloud_dl_range_lbl": "Номер или диапазон глав:",
+        "cloud_dl_range_ph": "Например: 1 или 1-10 или 1 2 3",
+        "cloud_dl_btn": "📥 Скачать PDF",
+        "reader_cloud_dl_btn": "📥 Скачать PDF",
+        "notice_dl_success_title": "Загрузка завершена",
+        "notice_dl_success_btn": "Отлично",
+        "notice_dl_error_title": "Ошибка загрузки",
+        "notice_dl_error_btn": "Понятно",
+        "cloud_dl_no_chapters": "Не найдено глав по фильтру '{range}'.",
+        "cloud_dl_start_status": "📥 Начат процесс загрузки {total} глав в библиотеку «{folder}»...",
+        "cloud_dl_chapter_status": "[{idx}/{total}] Загрузка Главы {ch}...",
+        "cloud_dl_saved_pdf": "✓ Глава {ch} сохранена как PDF.",
+        "cloud_dl_finish_success": "Успешно загружено {total} глав манхвы «{folder}»!",
+        "search_ph": "🔍 Поиск тайтлов...",
+        "filter_lang_all": "Все языки",
+        "filter_lang_ua": "🇺🇦 UA",
+        "filter_lang_en": "🇬🇧 EN",
+        "filter_lang_raw": "🌐 RAW",
+        "filter_prog_all": "Весь прогресс",
+        "filter_prog_reading": "📖 Читаю",
+        "filter_prog_completed": "✅ Прочитано",
+        "filter_prog_unread": "⏳ Не начато",
+        "search_count_lbl": "Найдено: {count}",
+        "btn_translate_nav": "⚔️ Translate",
+        "translate_not_found_title": "Модуль M_Translate не найден!",
+        "translate_not_found_msg": "У вас не установлен модуль Translate. Перейдите в наш официальный Telegram-канал, чтобы скачать полную версию приложения.",
+        "telegram_open_btn": "✈️ Открыть Telegram-канал",
+        "other_translations_avail": "🌐 Доступны другие переводы:",
+        "switch_trans_tip": "Перейти к {lang} версии: {title}"
     }
 }
 
@@ -406,7 +597,7 @@ def load_config() -> dict:
         "delete_pdf_after_extract": True,
         "tg_api_id": 37560778,
         "tg_api_hash": "307da2f94fc6450afe139c91bcc59eaa",
-        "tg_bot_token": "",
+        "tg_bot_token": DEFAULT_BOT_TOKEN,
         "bookmarks": {}
     }
     if CONFIG_FILE.exists():
@@ -416,6 +607,8 @@ def load_config() -> dict:
                 default_cfg.update(data)
         except Exception:
             pass
+    if not default_cfg.get("tg_bot_token"):
+        default_cfg["tg_bot_token"] = DEFAULT_BOT_TOKEN
     return default_cfg
 
 
@@ -447,6 +640,43 @@ def parse_chapter_filter(range_str: str) -> Optional[Set[int]]:
         return set(int(n) for n in nums)
 
     return None
+
+
+def normalize_search_text(text: str) -> str:
+    """Lowercases, removes extra punctuation and symbols for fuzzy/partial matching."""
+    if not text:
+        return ""
+    t = text.lower()
+    t = re.sub(r'[\'\"`_—–\-\(\)\[\]\{\}\.,:;!\\?]', ' ', t)
+    return " ".join(t.split())
+
+
+def matches_search_query(query: str, title: str, aliases: Optional[List[str]] = None, extra_tags: Optional[List[str]] = None) -> bool:
+    """
+    Checks if query matches title, any aliases, or extra tags in Ukrainian, English, Russian or romanized forms.
+    Returns True if every token of query appears in at least one of the candidate names.
+    """
+    q_norm = normalize_search_text(query)
+    if not q_norm:
+        return True
+    
+    candidates = [title]
+    if aliases:
+        candidates.extend(aliases)
+    if extra_tags:
+        candidates.extend(extra_tags)
+    
+    cand_strings = [normalize_search_text(c) for c in candidates if c]
+    joined_candidates = " ".join(cand_strings)
+    
+    # Check if whole normalized query is in joined candidates
+    if q_norm in joined_candidates:
+        return True
+    
+    # Or every token in query matches somewhere in candidates
+    q_tokens = q_norm.split()
+    return all(token in joined_candidates for token in q_tokens)
+
 
 
 # ---------------------------------------------------------------------------
@@ -669,122 +899,59 @@ class AmbientBackgroundWidget(QWidget):
 
 COMBO_BOX_STYLESHEET = """
 QComboBox {
-    background-color: #161922;
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    border-radius: 9px;
-    padding: 7px 12px;
-    color: #ffffff;
+    background-color: #121622;
+    color: #F3F4F6;
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-weight: 700;
     font-size: 13px;
-    font-weight: 600;
-    min-height: 28px;
-    outline: none;
-    selection-background-color: transparent;
-    selection-color: #ffffff;
+    min-height: 24px;
 }
 QComboBox:hover {
-    border: 1px solid #fbbf24;
-    background-color: #1a1e29;
-}
-QComboBox:focus {
-    border: 1.5px solid #fbbf24;
-    background-color: #161922;
-    outline: none;
-}
-QComboBox:on {
-    border: 1.5px solid #fbbf24;
-    background-color: #161922;
+    border-color: #F59E0B;
 }
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 28px;
-    border: none;
-    background: transparent;
+    width: 22px;
+    border-left: none;
 }
 QComboBox::down-arrow {
     image: none;
     border-left: 5px solid transparent;
     border-right: 5px solid transparent;
-    border-top: 6px solid #fbbf24;
-    margin-right: 10px;
-    margin-top: 2px;
+    border-top: 6px solid #F59E0B;
+    margin-right: 6px;
 }
 QComboBox QAbstractItemView {
-    background-color: #161922;
-    border: 1.5px solid #fbbf24;
+    background-color: #121622;
+    color: #F3F4F6;
+    border: 1.5px solid #F59E0B;
     border-radius: 8px;
-    color: #ffffff;
-    selection-background-color: #2b3145;
-    selection-color: #fbbf24;
-    padding: 4px;
+    selection-background-color: #F59E0B;
+    selection-color: #000000;
     outline: none;
+    padding: 4px;
 }
 QComboBox QAbstractItemView::item {
     min-height: 28px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    color: #ffffff;
-    background-color: transparent;
-}
-QComboBox QAbstractItemView::item:hover {
-    background-color: #232838;
-    color: #fbbf24;
+    padding: 4px 10px;
+    color: #F3F4F6;
+    border-radius: 4px;
 }
 QComboBox QAbstractItemView::item:selected {
-    background-color: #2b3145;
-    color: #fbbf24;
-    font-weight: 700;
+    background-color: #F59E0B;
+    color: #000000;
+    font-weight: bold;
 }
 """
 
 
 def apply_combo_style(combo: QComboBox):
+    from PyQt6.QtWidgets import QListView
+    combo.setView(QListView())
     combo.setStyleSheet(COMBO_BOX_STYLESHEET)
-    pal = combo.palette()
-    pal.setColor(QPalette.ColorRole.Base, QColor("#161922"))
-    pal.setColor(QPalette.ColorRole.Window, QColor("#161922"))
-    pal.setColor(QPalette.ColorRole.Highlight, QColor("#161922"))
-    pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
-    pal.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
-    pal.setColor(QPalette.ColorRole.Button, QColor("#161922"))
-    combo.setPalette(pal)
-    view = combo.view()
-    if view:
-        v_pal = view.palette()
-        v_pal.setColor(QPalette.ColorRole.Base, QColor("#161922"))
-        v_pal.setColor(QPalette.ColorRole.Window, QColor("#161922"))
-        v_pal.setColor(QPalette.ColorRole.Highlight, QColor("#2b3145"))
-        v_pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#fbbf24"))
-        v_pal.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
-        view.setPalette(v_pal)
-        view.setStyleSheet("""
-            QAbstractItemView {
-                background-color: #161922;
-                border: 1.5px solid #fbbf24;
-                border-radius: 8px;
-                color: #ffffff;
-                outline: none;
-                padding: 4px;
-                selection-background-color: #2b3145;
-                selection-color: #fbbf24;
-            }
-            QAbstractItemView::item {
-                min-height: 28px;
-                padding: 6px 12px;
-                border-radius: 6px;
-                color: #ffffff;
-                background-color: transparent;
-            }
-            QAbstractItemView::item:hover {
-                background-color: #232838;
-                color: #fbbf24;
-            }
-            QAbstractItemView::item:selected {
-                background-color: #2b3145;
-                color: #fbbf24;
-                font-weight: 700;
-            }
-        """)
 
 
 # ---------------------------------------------------------------------------
@@ -1196,51 +1363,281 @@ class ChapterAlreadyExistsDialog(QDialog):
 # Notice Dialog (Dark card info popup)
 # ---------------------------------------------------------------------------
 class NoticeDialog(QDialog):
-    def __init__(self, title: str, message: str, btn_text: str = "Зрозуміло", parent=None):
+    def __init__(self, title: str, message: str, btn_text: str = "Зрозуміло", action_btn_text: Optional[str] = None, on_action_click=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setFixedSize(430, 210)
+        self.setFixedSize(480, 240)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
         self.setStyleSheet("""
             QDialog {
-                background-color: #141722;
-                border: 1px solid rgba(239, 68, 68, 0.4);
+                background-color: #12151f;
+                border: 1.5px solid rgba(245, 158, 11, 0.55);
                 border-radius: 16px;
             }
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setContentsMargins(26, 22, 26, 22)
         layout.setSpacing(14)
 
+        hdr_row = QHBoxLayout()
         title_lbl = QLabel(f"⚠️ {title}")
-        title_lbl.setStyleSheet("font-size: 16px; font-weight: 700; color: #f87171;")
-        layout.addWidget(title_lbl)
+        title_lbl.setStyleSheet("font-size: 16px; font-weight: 800; color: #fbbf24;")
+        hdr_row.addWidget(title_lbl)
+        hdr_row.addStretch()
+
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(22, 22)
+        close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #94a3b8;
+                font-weight: 700;
+                font-size: 13px;
+                border: none;
+            }
+            QPushButton:hover {
+                color: #ef4444;
+            }
+        """)
+        close_btn.clicked.connect(self.reject)
+        hdr_row.addWidget(close_btn)
+        layout.addLayout(hdr_row)
 
         msg_lbl = QLabel(message)
-        msg_lbl.setStyleSheet("font-size: 13px; font-weight: 500; color: #e5e7eb; line-height: 1.4;")
+        msg_lbl.setStyleSheet("font-size: 13px; font-weight: 500; color: #e5e7eb; line-height: 1.45;")
         msg_lbl.setWordWrap(True)
         layout.addWidget(msg_lbl)
 
         layout.addStretch()
 
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
         btn_layout.addStretch()
+
         ok_btn = QPushButton(btn_text)
         ok_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         ok_btn.setStyleSheet("""
-            background-color: #212636;
-            color: #f3f4f6;
-            font-weight: 600;
-            font-size: 13px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 9px;
-            padding: 8px 18px;
+            QPushButton {
+                background-color: #1e2433;
+                color: #cbd5e1;
+                font-weight: 600;
+                font-size: 13px;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 9px;
+                padding: 8px 18px;
+            }
+            QPushButton:hover {
+                background-color: #2a3347;
+                color: #ffffff;
+            }
         """)
         ok_btn.clicked.connect(self.accept)
         btn_layout.addWidget(ok_btn)
 
+        if action_btn_text and on_action_click:
+            act_btn = QPushButton(action_btn_text)
+            act_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            act_btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f59e0b, stop:1 #d97706);
+                    color: #110d04;
+                    font-weight: 800;
+                    font-size: 13px;
+                    border: none;
+                    border-radius: 9px;
+                    padding: 8px 20px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fbbf24, stop:1 #b45309);
+                }
+            """)
+            act_btn.clicked.connect(lambda: (on_action_click(), self.accept()))
+            btn_layout.addWidget(act_btn)
+
         layout.addLayout(btn_layout)
+
+
+
+# ---------------------------------------------------------------------------
+# Floating Single Chapter PDF Download Dialog (Compact & Clean)
+# ---------------------------------------------------------------------------
+class SingleChapterDownloadDialog(QDialog):
+    """
+    Floating dialog to download chapter PDF(s) from cloud into local library.
+    Allows specifying target folder name (manhwa title on PC) and chapter range.
+    """
+    download_requested = pyqtSignal(str, str, str)  # title_code, pc_folder_name, chapter_filter
+
+    def __init__(self, title_code: str, title_info: dict, current_ch: int, lib_dir: Path, t: dict = None, parent=None):
+        super().__init__(parent)
+        self.title_code = title_code
+        self.title_info = title_info
+        self.current_ch = current_ch
+        self.lib_dir = lib_dir
+        self.t = t or TRANSLATIONS.get("uk")
+
+        self.setWindowTitle(self.t.get("cloud_dl_dlg_title", "Завантажити PDF"))
+        self.setFixedSize(460, 340)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #121622;
+                border: 1px solid rgba(59, 130, 246, 0.45);
+                border-radius: 16px;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 20)
+        layout.setSpacing(12)
+
+        # Header
+        hdr_row = QHBoxLayout()
+        full_name = title_info.get("title_name") or title_code
+        hdr_lbl = QLabel(self.t.get("cloud_dl_dlg_header", "📥 Завантажити главу (PDF)"))
+        hdr_lbl.setStyleSheet("font-size: 16px; font-weight: 800; color: #60A5FA;")
+        hdr_row.addWidget(hdr_lbl)
+        hdr_row.addStretch()
+
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(24, 24)
+        close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #94A3B8;
+                font-weight: 700;
+                font-size: 14px;
+                border: none;
+            }
+            QPushButton:hover {
+                color: #EF4444;
+            }
+        """)
+        close_btn.clicked.connect(self.reject)
+        hdr_row.addWidget(close_btn)
+        layout.addLayout(hdr_row)
+
+        # Total chapters info
+        chapters_dict = title_info.get("chapters", {})
+        sorted_chs = sorted([int(k) for k in chapters_dict.keys() if str(k).isdigit()])
+        if sorted_chs:
+            total_chs_text = self.t.get(
+                "cloud_dl_total_range",
+                "Всього доступно глав у сховищі: {min_ch}–{max_ch} (всього {total})"
+            ).format(min_ch=min(sorted_chs), max_ch=max(sorted_chs), total=len(sorted_chs))
+        else:
+            total_chs_text = self.t.get(
+                "cloud_dl_total_count",
+                "Всього доступно глав у сховищі: {total}"
+            ).format(total=len(chapters_dict))
+
+        sub_info = QLabel(f"«{full_name}»\n{total_chs_text}")
+        sub_info.setStyleSheet("font-size: 12px; color: #94A3B8; font-weight: 500; line-height: 1.3;")
+        sub_info.setWordWrap(True)
+        layout.addWidget(sub_info)
+
+        # Input 1: Folder name on PC in library
+        lbl_folder = QLabel(self.t.get("cloud_dl_folder_lbl", "Куди зберегти (назва папки у Library):"))
+        lbl_folder.setStyleSheet("font-size: 13px; font-weight: 600; color: #E2E8F0;")
+        layout.addWidget(lbl_folder)
+
+        # Default folder name is title_name or sanitized code
+        default_folder = title_info.get("title_name") or title_code
+        self.folder_inp = QLineEdit(default_folder)
+        self.folder_inp.setStyleSheet("""
+            QLineEdit {
+                background-color: #0B0E17;
+                color: #FFFFFF;
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QLineEdit:focus {
+                border-color: #60A5FA;
+            }
+        """)
+        layout.addWidget(self.folder_inp)
+
+        # Input 2: Chapter number / range
+        lbl_range = QLabel(self.t.get("cloud_dl_range_lbl", "Номер або діапазон глав:"))
+        lbl_range.setStyleSheet("font-size: 13px; font-weight: 600; color: #E2E8F0;")
+        layout.addWidget(lbl_range)
+
+        self.ch_inp = QLineEdit(str(current_ch))
+        self.ch_inp.setPlaceholderText(self.t.get("cloud_dl_range_ph", "Наприклад: 1 або 1-10 або 1 2 3"))
+        self.ch_inp.setStyleSheet("""
+            QLineEdit {
+                background-color: #0B0E17;
+                color: #FFFFFF;
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QLineEdit:focus {
+                border-color: #60A5FA;
+            }
+        """)
+        layout.addWidget(self.ch_inp)
+
+        layout.addStretch()
+
+        # Action Buttons
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        cancel_btn = QPushButton(self.t.get("cancel", "Скасувати"))
+        cancel_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1F2433;
+                color: #94A3B8;
+                font-weight: 600;
+                font-size: 13px;
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 9px;
+                padding: 9px 16px;
+            }
+            QPushButton:hover {
+                background-color: #2D3748;
+                color: #FFFFFF;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+
+        dl_btn = QPushButton(self.t.get("cloud_dl_btn", "📥 Завантажити PDF"))
+        dl_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        dl_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3B82F6, stop:1 #1D4ED8);
+                color: #FFFFFF;
+                font-weight: 800;
+                font-size: 13px;
+                border: none;
+                border-radius: 9px;
+                padding: 9px 18px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #60A5FA, stop:1 #2563EB);
+            }
+        """)
+        dl_btn.clicked.connect(self._on_start_download)
+        btn_row.addWidget(dl_btn)
+
+        layout.addLayout(btn_row)
+
+    def _on_start_download(self):
+        folder_name = self.folder_inp.text().strip() or self.title_code
+        ch_filter = self.ch_inp.text().strip() or str(self.current_ch)
+        self.download_requested.emit(self.title_code, folder_name, ch_filter)
+        self.accept()
 
 
 # ---------------------------------------------------------------------------
@@ -1335,7 +1732,7 @@ class DownloadWorker(QThread):
     finished_signal = pyqtSignal(bool, str)
     need_auth_signal = pyqtSignal()
 
-    def __init__(self, api_id: int, api_hash: str, channel: str, search_kw: str, range_str: str, title: str, lib_dir: Path, extract_to_jpeg: bool, del_pdf: bool, t: dict = None, force_redownload: bool = False):
+    def __init__(self, api_id: int, api_hash: str, channel: str, search_kw: str, range_str: str, title: str, lib_dir: Path, extract_to_jpeg: bool, del_pdf: bool, t: dict = None, force_redownload: bool = False, is_novel: bool = False, duplicate_mode: str = "newest"):
         super().__init__()
         self.api_id = api_id
         self.api_hash = api_hash
@@ -1348,6 +1745,8 @@ class DownloadWorker(QThread):
         self.del_pdf = del_pdf
         self.t = t or TRANSLATIONS.get("uk")
         self.force_redownload = force_redownload
+        self.is_novel = is_novel
+        self.duplicate_mode = duplicate_mode  # "newest", "oldest", "all"
 
     def run(self):
         loop = asyncio.new_event_loop()
@@ -1390,10 +1789,45 @@ class DownloadWorker(QThread):
                 elif ch_num in allowed_chapters:
                     filtered.append(it)
 
+            # Розумна фільтрація дублікатів (коли в каналі є стара і нова манхва або перезапуск)
+            if self.duplicate_mode in ["newest", "oldest"] and filtered:
+                ch_map = {}
+                for it in filtered:
+                    c = it.get("chapter", -1)
+                    if c not in ch_map:
+                        ch_map[c] = []
+                    ch_map[c].append(it)
+
+                deduped = []
+                for c, group in ch_map.items():
+                    if len(group) == 1 or c == -1:
+                        deduped.extend(group)
+                    else:
+                        # Сортуємо групу за message.id
+                        group.sort(key=lambda x: x["id"])
+                        if self.duplicate_mode == "newest":
+                            chosen = group[-1]  # Найновіший реліз
+                            skipped = group[:-1]
+                            deduped.append(chosen)
+                            self.status_signal.emit(f"⚡ Глава {c}: обрано новіший файл «{chosen['filename']}» (пропущено старіші: {', '.join(s['filename'] for s in skipped)})")
+                        elif self.duplicate_mode == "oldest":
+                            chosen = group[0]   # Перший оригінальний
+                            skipped = group[1:]
+                            deduped.append(chosen)
+                            self.status_signal.emit(f"📦 Глава {c}: обрано старіший файл «{chosen['filename']}» (пропущено новіші: {', '.join(s['filename'] for s in skipped)})")
+                
+                filtered = deduped
+                filtered.sort(key=lambda x: (x["chapter"] if x["chapter"] != -1 else 999999, x["id"]))
+
             if not filtered:
                 raise RuntimeError(f"Жодна глава не відповідає фільтру '{self.range_str}'. Знайдені глави: {[x.get('chapter') for x in items[:10]]}")
 
-            target_dir = self.lib_dir / self.title
+            if self.is_novel:
+                novels_dir = self.lib_dir / "novels_library"
+                novels_dir.mkdir(parents=True, exist_ok=True)
+                target_dir = novels_dir / self.title
+            else:
+                target_dir = self.lib_dir / self.title
             target_dir.mkdir(parents=True, exist_ok=True)
             total = len(filtered)
             self.status_signal.emit(self.t.get("dl_log_total_to_download", "Буде завантажено глав: {count}. Розпочинаємо...").format(count=total))
@@ -1494,18 +1928,110 @@ class DownloadWorker(QThread):
 
 
 # ---------------------------------------------------------------------------
+# Background Worker to Download Chapters from Cloud Vault to Local Library
+# ---------------------------------------------------------------------------
+class CloudDownloadWorker(QThread):
+    progress_signal = pyqtSignal(float)
+    status_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool, str)
+
+    def __init__(self, stream_client: TelegramStreamClient, vault_target: Any, title_code: str, title_info: dict, pc_folder_name: str, range_str: str, lib_dir: Path, t: dict = None):
+        super().__init__()
+        self.stream_client = stream_client
+        self.vault_target = vault_target
+        self.title_code = title_code
+        self.title_info = title_info
+        self.pc_folder_name = pc_folder_name
+        self.range_str = range_str
+        self.lib_dir = lib_dir
+        self.t = t or TRANSLATIONS.get("uk")
+        self._is_cancelled = False
+
+    def cancel(self):
+        self._is_cancelled = True
+
+    def run(self):
+        try:
+            target_m_dir = self.lib_dir / self.pc_folder_name
+            target_m_dir.mkdir(parents=True, exist_ok=True)
+
+            chapters_dict = self.title_info.get("chapters", {})
+            allowed_chapters = parse_chapter_filter(self.range_str)
+
+            matching_chapters = []
+            for ch_k, ch_val in chapters_dict.items():
+                try:
+                    c_num = int(ch_k)
+                    msg_id = ch_val.get("vault_msg_id") or ch_val.get("message_id")
+                    if not msg_id:
+                        continue
+                    if allowed_chapters is None or c_num in allowed_chapters:
+                        matching_chapters.append((c_num, msg_id, ch_val))
+                except Exception:
+                    pass
+
+            matching_chapters.sort(key=lambda x: x[0])
+
+            if not matching_chapters:
+                raise RuntimeError(self.t.get("cloud_dl_no_chapters", "Не знайдено глав за фільтром '{range}'.").format(range=self.range_str))
+
+            total = len(matching_chapters)
+            self.status_signal.emit(self.t.get("cloud_dl_start_status", "📥 Розпочато завантаження {total} глав у бібліотеку «{folder}»...").format(total=total, folder=self.pc_folder_name))
+
+            for idx, (c_num, msg_id, c_meta) in enumerate(matching_chapters):
+                if self._is_cancelled:
+                    break
+
+                self.status_signal.emit(self.t.get("cloud_dl_chapter_status", "[{idx}/{total}] Завантаження Глави {ch}...").format(idx=idx + 1, total=total, ch=c_num))
+
+                def sub_prog(pct, cur, tot):
+                    overall = (idx + pct) / total
+                    self.progress_signal.emit(overall)
+
+                data = self.stream_client.fetch_message_stream_sync(self.vault_target, msg_id, sub_prog)
+
+                # Save directly as PDF into chapter folder
+                ch_dir = target_m_dir / f"chapter_{c_num:03d}"
+                ch_dir.mkdir(parents=True, exist_ok=True)
+                pdf_target = ch_dir / f"chapter_pdf_{c_num:03d}.pdf"
+                with open(pdf_target, "wb") as f:
+                    f.write(data)
+
+                # Generate cover.jpg if not present yet
+                cover_p = target_m_dir / "cover.jpg"
+                if not cover_p.exists() and fitz:
+                    try:
+                        doc = fitz.open(stream=data, filetype="pdf")
+                        if len(doc) > 0:
+                            doc[0].get_pixmap(dpi=150).save(str(cover_p))
+                        doc.close()
+                    except Exception:
+                        pass
+
+                self.progress_signal.emit((idx + 1) / total)
+                self.status_signal.emit(self.t.get("cloud_dl_saved_pdf", "✓ Глава {ch} збережена як PDF.").format(ch=c_num))
+
+            msg = self.t.get("cloud_dl_finish_success", "Успішно завантажено {total} глав манхви «{folder}»!").format(total=total, folder=self.pc_folder_name)
+            self.finished_signal.emit(True, msg)
+        except Exception as e:
+            self.finished_signal.emit(False, str(e))
+
+
+# ---------------------------------------------------------------------------
 # Manhwa Card in Catalog
 # ---------------------------------------------------------------------------
 class ManhwaCard(QFrame):
     read_clicked = pyqtSignal(str)
     delete_clicked = pyqtSignal(str)
+    switch_translation_clicked = pyqtSignal(dict)  # item info dict with "type", "target", etc.
 
-    def __init__(self, manhwa_name: str, manhwa_path: Path, bookmark_info: dict, lang_dict: dict, parent=None):
+    def __init__(self, manhwa_name: str, manhwa_path: Path, bookmark_info: dict, lang_dict: dict, linked_translations: Optional[List[dict]] = None, parent=None):
         super().__init__(parent)
         self.manhwa_name = manhwa_name
         self.manhwa_path = manhwa_path
         self.bookmark_info = bookmark_info
         self.lang_dict = lang_dict
+        self.linked_translations = linked_translations or []
 
         self.setObjectName("manhwaCard")
         self.setStyleSheet("""
@@ -1519,16 +2045,16 @@ class ManhwaCard(QFrame):
                 background-color: rgba(28, 33, 46, 0.98);
             }
         """)
-        self.setFixedSize(260, 400)
+        self.setFixedSize(260, 420)
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         self.cover_lbl = QLabel()
-        self.cover_lbl.setFixedHeight(230)
+        self.cover_lbl.setFixedHeight(210)
         self.cover_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cover_lbl.setStyleSheet("""
             background-color: #0c0e14;
@@ -1539,9 +2065,9 @@ class ManhwaCard(QFrame):
         layout.addWidget(self.cover_lbl)
 
         title_lbl = QLabel(self.manhwa_name)
-        title_lbl.setStyleSheet("font-size: 15px; font-weight: 700; color: #f3f4f6;")
+        title_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #f3f4f6;")
         title_lbl.setWordWrap(True)
-        title_lbl.setFixedHeight(42)
+        title_lbl.setFixedHeight(38)
         layout.addWidget(title_lbl)
 
         ch_count = self.get_chapter_count()
@@ -1552,8 +2078,51 @@ class ManhwaCard(QFrame):
             bm_text = f"Ch. {ch_num} ({pct}%)"
 
         info_lbl = QLabel(f"📁 {ch_count}  •  🔖 {bm_text}")
-        info_lbl.setStyleSheet("font-size: 12px; color: #9ca3af; font-weight: 500;")
+        info_lbl.setStyleSheet("font-size: 11px; color: #9ca3af; font-weight: 500;")
         layout.addWidget(info_lbl)
+
+        # Linked Translations Pills (if available)
+        if self.linked_translations:
+            pills_row = QHBoxLayout()
+            pills_row.setContentsMargins(0, 0, 0, 0)
+            pills_row.setSpacing(5)
+
+            pills_badge = QLabel("🌐")
+            pills_badge.setStyleSheet("font-size: 11px; color: #94a3b8;")
+            pills_row.addWidget(pills_badge)
+
+            for item in self.linked_translations:
+                l_code = item.get("lang", "").upper()
+                l_target = item.get("target") or item.get("title", "")
+                pill_btn = QPushButton(l_code)
+                pill_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                tip = self.lang_dict.get("switch_trans_tip", "Перейти до {lang} версії: {title}").format(
+                    lang=l_code, title=item.get("title", l_target)
+                )
+                pill_btn.setToolTip(tip)
+                pill_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(245, 158, 11, 0.15);
+                        color: #fbbf24;
+                        border: 1px solid rgba(245, 158, 11, 0.4);
+                        border-radius: 5px;
+                        padding: 1px 6px;
+                        font-size: 10px;
+                        font-weight: 800;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(245, 158, 11, 0.35);
+                        color: #ffffff;
+                        border-color: #f59e0b;
+                    }
+                """)
+                pill_btn.clicked.connect(lambda _, it=item: self.switch_translation_clicked.emit(it))
+                pills_row.addWidget(pill_btn)
+
+            pills_row.addStretch()
+            layout.addLayout(pills_row)
+        else:
+            layout.addSpacing(2)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
@@ -1564,10 +2133,10 @@ class ManhwaCard(QFrame):
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fbbf24, stop:1 #d97706);
                 color: #121008;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 800;
-                border-radius: 10px;
-                padding: 10px 14px;
+                border-radius: 9px;
+                padding: 8px 12px;
                 border: none;
             }
             QPushButton:hover {
@@ -1584,11 +2153,11 @@ class ManhwaCard(QFrame):
             QPushButton {
                 background-color: rgba(239, 68, 68, 0.16);
                 color: #f87171;
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 700;
                 border: 1px solid rgba(239, 68, 68, 0.35);
-                border-radius: 10px;
-                padding: 8px 10px;
+                border-radius: 9px;
+                padding: 7px 9px;
             }
             QPushButton:hover {
                 background-color: rgba(220, 38, 38, 0.35);
@@ -1638,12 +2207,212 @@ class ManhwaCard(QFrame):
         if cover_path and cover_path.exists():
             pm = QPixmap(str(cover_path))
             if not pm.isNull():
-                scaled = pm.scaled(232, 230, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-                rect = QRect((scaled.width() - 232) // 2, (scaled.height() - 230) // 2, 232, 230)
+                scaled = pm.scaled(232, 210, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+                rect = QRect((scaled.width() - 232) // 2, (scaled.height() - 210) // 2, 232, 210)
                 self.cover_lbl.setPixmap(scaled.copy(rect))
                 return
 
         self.cover_lbl.setText("📖\nCover")
+
+
+# ---------------------------------------------------------------------------
+# Cloud Manhwa Card (Streamable from Telegram Vault)
+# ---------------------------------------------------------------------------
+class CloudManhwaCard(QFrame):
+    read_cloud_clicked = pyqtSignal(str)
+    download_cloud_clicked = pyqtSignal(str)
+    switch_translation_clicked = pyqtSignal(dict)  # item info dict with "type", "target", etc.
+
+    def __init__(self, title: str, cloud_entry: dict, bookmark_info: dict, lang_dict: dict, linked_translations: Optional[List[dict]] = None, parent=None):
+        super().__init__(parent)
+        self.title = title
+        self.cloud_entry = cloud_entry
+        self.bookmark_info = bookmark_info
+        self.lang_dict = lang_dict
+        self.linked_translations = linked_translations or cloud_entry.get("linked_translations", [])
+
+        self.setObjectName("cloudManhwaCard")
+        self.setStyleSheet("""
+            #cloudManhwaCard {
+                background-color: rgba(18, 24, 38, 0.94);
+                border: 1px solid rgba(59, 130, 246, 0.25);
+                border-radius: 16px;
+            }
+            #cloudManhwaCard:hover {
+                border: 1px solid rgba(59, 130, 246, 0.70);
+                background-color: rgba(22, 30, 48, 0.98);
+            }
+        """)
+        self.setFixedSize(270, 435)
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(8)
+
+        # Top Badge: Cloud Stream
+        badge_row = QHBoxLayout()
+        badge_lbl = QLabel(f" ☁️ {self.lang_dict.get('cloud_badge', 'CLOUD')} ")
+        badge_lbl.setFont(QFont("Segoe UI Black", 8))
+        badge_lbl.setStyleSheet("""
+            background-color: rgba(59, 130, 246, 0.20);
+            color: #60A5FA;
+            border: 1px solid rgba(59, 130, 246, 0.45);
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-weight: 800;
+        """)
+        badge_row.addWidget(badge_lbl)
+
+        code = self.cloud_entry.get("code") or self.cloud_entry.get("title_code", "")
+        lang = self.cloud_entry.get("lang", "")
+        badge_text = f"[{code}]" if code else ""
+        if lang:
+            badge_text = f"{badge_text} [{lang}]" if badge_text else f"[{lang}]"
+        if badge_text:
+            code_lbl = QLabel(badge_text)
+            code_lbl.setFont(QFont("Segoe UI Black", 8))
+            code_lbl.setStyleSheet("color: #94A3B8; font-weight: 700;")
+            badge_row.addWidget(code_lbl)
+
+        badge_row.addStretch()
+        layout.addLayout(badge_row)
+
+        # Cover (Stylized cloud cover preview)
+        self.cover_lbl = QLabel()
+        self.cover_lbl.setFixedHeight(155)
+        self.cover_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.cover_lbl.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #111827, stop:1 #1E293B);
+            border-radius: 10px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            color: #93C5FD;
+            font-weight: 700;
+            font-size: 13px;
+        """)
+        display_code = code or self.title
+        self.cover_lbl.setText(f"☁️\n{display_code}\nONLINE")
+        layout.addWidget(self.cover_lbl)
+
+        self.full_title = self.cloud_entry.get("title_name") or self.title
+        title_lbl = QLabel(self.full_title)
+        title_lbl.setToolTip(self.full_title)
+        title_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #F3F4F6;")
+        title_lbl.setWordWrap(True)
+        title_lbl.setFixedHeight(34)
+        layout.addWidget(title_lbl)
+
+        chapters = self.cloud_entry.get("chapters", {})
+        ch_count = len(chapters)
+        bm_text = self.lang_dict.get("cloud_card_new", "Нова")
+        if self.bookmark_info:
+            ch_num = self.bookmark_info.get("chapter", 1)
+            pct = int(self.bookmark_info.get("chapter_progress", 0) * 100)
+            bm_text = f"Ch. {ch_num} ({pct}%)"
+
+        info_row = QHBoxLayout()
+        info_row.setContentsMargins(0, 0, 0, 0)
+        info_row.setSpacing(6)
+
+        chs_word = self.lang_dict.get("cloud_card_chs_word", "глав")
+        info_lbl = QLabel(f"☁️ {ch_count} {chs_word} • 🔖 {bm_text}")
+        info_lbl.setStyleSheet("font-size: 11px; color: #94A3B8; font-weight: 600;")
+        info_row.addWidget(info_lbl)
+        info_row.addStretch()
+        layout.addLayout(info_row)
+
+        # Action Buttons Row: Download PDF + Stream Read
+        actions_row = QHBoxLayout()
+        actions_row.setContentsMargins(0, 2, 0, 0)
+        actions_row.setSpacing(8)
+
+        card_dl_btn = QPushButton(self.lang_dict.get("cloud_card_dl_btn", "📥 Завантажити"))
+        card_dl_btn.setToolTip(self.lang_dict.get("cloud_card_dl_tooltip", "Завантажити PDF у локальну бібліотеку"))
+        card_dl_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        card_dl_btn.setFixedHeight(32)
+        card_dl_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.14);
+                color: #60A5FA;
+                font-size: 11px;
+                font-weight: 700;
+                border: 1px solid rgba(59, 130, 246, 0.40);
+                border-radius: 8px;
+                padding: 4px 10px;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.28);
+                color: #93C5FD;
+                border-color: #60A5FA;
+            }
+        """)
+        card_dl_btn.clicked.connect(lambda: self.download_cloud_clicked.emit(self.title))
+        actions_row.addWidget(card_dl_btn)
+
+        read_btn = QPushButton(self.lang_dict.get("cloud_stream_read", "⚡ Читати онлайн"))
+        read_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        read_btn.setFixedHeight(32)
+        read_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3B82F6, stop:1 #1D4ED8);
+                color: #FFFFFF;
+                font-size: 12px;
+                font-weight: 800;
+                border-radius: 8px;
+                padding: 4px 12px;
+                border: none;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #60A5FA, stop:1 #2563EB);
+            }
+        """)
+        read_btn.clicked.connect(lambda: self.read_cloud_clicked.emit(self.title))
+        actions_row.addWidget(read_btn, stretch=1)
+        layout.addLayout(actions_row)
+
+        # Linked Translations Pills (if available)
+        if self.linked_translations:
+            pills_row = QHBoxLayout()
+            pills_row.setContentsMargins(0, 0, 0, 0)
+            pills_row.setSpacing(5)
+
+            pills_badge = QLabel("🌐")
+            pills_badge.setStyleSheet("font-size: 11px; color: #94a3b8;")
+            pills_row.addWidget(pills_badge)
+
+            for item in self.linked_translations:
+                l_code = item.get("lang", "").upper()
+                l_target = item.get("target") or item.get("title", "")
+                pill_btn = QPushButton(l_code)
+                pill_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                tip = self.lang_dict.get("switch_trans_tip", "Перейти до {lang} версії: {title}").format(
+                    lang=l_code, title=item.get("title", l_target)
+                )
+                pill_btn.setToolTip(tip)
+                pill_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(59, 130, 246, 0.18);
+                        color: #60a5fa;
+                        border: 1px solid rgba(59, 130, 246, 0.45);
+                        border-radius: 5px;
+                        padding: 1px 6px;
+                        font-size: 10px;
+                        font-weight: 800;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(59, 130, 246, 0.35);
+                        color: #ffffff;
+                        border-color: #93c5fd;
+                    }
+                """)
+                pill_btn.clicked.connect(lambda _, it=item: self.switch_translation_clicked.emit(it))
+                pills_row.addWidget(pill_btn)
+
+            pills_row.addStretch()
+            layout.addLayout(pills_row)
+        else:
+            layout.addSpacing(2)
 
 
 # ---------------------------------------------------------------------------
@@ -1670,6 +2439,9 @@ class WebtoonScrollCanvas(QScrollArea):
 
         self.active_ch_num = 1
         self.is_restoring_scroll = False
+        self.is_cloud_mode = False
+        self.rolling_cache: Optional[RollingRAMCache] = None
+        self.cloud_chapter_map: Dict[int, int] = {}
 
         self.scale_timer = QTimer(self)
         self.scale_timer.setSingleShot(True)
@@ -1693,12 +2465,85 @@ class WebtoonScrollCanvas(QScrollArea):
         self.strip_layout.setContentsMargins(0, 0, 0, 0)
         self.strip_layout.setSpacing(0)
 
+        # Cloud In-Memory Streaming Progress Box
+        self.cloud_loading_frame = QFrame()
+        self.cloud_loading_frame.setStyleSheet("""
+            QFrame {
+                background-color: #111827;
+                border: 1px solid rgba(59, 130, 246, 0.4);
+                border-radius: 12px;
+                padding: 24px;
+                margin: 40px;
+            }
+        """)
+        cl_layout = QVBoxLayout(self.cloud_loading_frame)
+        cl_layout.setSpacing(12)
+        cl_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.cloud_status_lbl = QLabel("☁️ Завантаження глави у пам'ять (RAM)...")
+        self.cloud_status_lbl.setStyleSheet("color: #93C5FD; font-size: 15px; font-weight: 700;")
+        self.cloud_status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cl_layout.addWidget(self.cloud_status_lbl)
+
+        self.cloud_prog_bar = QProgressBar()
+        self.cloud_prog_bar.setRange(0, 100)
+        self.cloud_prog_bar.setValue(0)
+        self.cloud_prog_bar.setTextVisible(True)
+        self.cloud_prog_bar.setFixedWidth(360)
+        self.cloud_prog_bar.setFixedHeight(18)
+        self.cloud_prog_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #1F2937;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 9px;
+                text-align: center;
+                color: #FFFFFF;
+                font-weight: 700;
+                font-size: 11px;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3B82F6, stop:1 #60A5FA);
+                border-radius: 8px;
+            }
+        """)
+        cl_layout.addWidget(self.cloud_prog_bar, 0, Qt.AlignmentFlag.AlignCenter)
+
+        self.cloud_bytes_lbl = QLabel("0.0 MB / 0.0 MB (0%)")
+        self.cloud_bytes_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        self.cloud_bytes_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cl_layout.addWidget(self.cloud_bytes_lbl)
+
+        self.cloud_loading_frame.hide()
+
         self.main_layout.addStretch(1)
         self.main_layout.addWidget(self.strip_widget)
+        self.main_layout.addWidget(self.cloud_loading_frame)
         self.main_layout.addStretch(1)
 
         self.setWidget(self.container)
         self.verticalScrollBar().valueChanged.connect(self.on_scroll)
+
+    def show_cloud_progress(self, ch_num: int, pct: float, cur_bytes: int, total_bytes: int):
+        self.strip_widget.hide()
+        self.cloud_loading_frame.show()
+        c_mb = cur_bytes / (1024 * 1024)
+        t_mb = total_bytes / (1024 * 1024) if total_bytes > 0 else 0
+        self.cloud_status_lbl.setText(f"☁️ Стрімінг глави {ch_num} безпосередньо у RAM...")
+        self.cloud_prog_bar.setValue(int(pct))
+        if total_bytes > 0:
+            self.cloud_bytes_lbl.setText(f"{c_mb:.1f} MB / {t_mb:.1f} MB ({int(pct)}%)")
+        else:
+            self.cloud_bytes_lbl.setText(f"{c_mb:.1f} MB завантажено...")
+
+    def show_cloud_error(self, ch_num: int, err_msg: str):
+        self.strip_widget.hide()
+        self.cloud_loading_frame.show()
+        self.cloud_status_lbl.setText(f"⚠️ Помилка завантаження глави {ch_num}")
+        self.cloud_bytes_lbl.setText(str(err_msg))
+
+    def hide_cloud_progress(self):
+        self.cloud_loading_frame.hide()
+        self.strip_widget.show()
 
     def set_reading_width(self, width: int):
         self.reading_width = width
@@ -1779,6 +2624,73 @@ class WebtoonScrollCanvas(QScrollArea):
         self.loaded_chapters.clear()
         self.chapter_modes.clear()
         self.pixmap_cache.clear()
+        if self.rolling_cache:
+            self.rolling_cache.clear_all()
+
+    def load_cloud_stream_chapter(self, title: str, start_ch_num: int, pdf_bytes: bytes, chapter_map: dict, stream_client: TelegramStreamClient):
+        self.is_cloud_mode = True
+        self.current_manhwa_name = title
+        self.current_manhwa_path = None
+        self.active_ch_num = start_ch_num
+        self.active_mode = "pdf"
+        self.cloud_chapter_map = chapter_map
+
+        if not self.rolling_cache:
+            self.rolling_cache = RollingRAMCache(stream_client, None)
+            self.rolling_cache.preload_finished_signal.connect(self._on_cloud_preload_finished)
+        self.rolling_cache.set_chapter_map(chapter_map)
+
+        self.clear_canvas()
+        self.hide_cloud_progress()
+        self.loaded_chapters.add(start_ch_num)
+        self.chapter_modes[start_ch_num] = "pdf"
+
+        target_w = int(self.reading_width * self.zoom)
+        self.strip_widget.setFixedWidth(target_w)
+
+        rendered_pages = self.rolling_cache.render_pdf_stream(start_ch_num, pdf_bytes, target_w=target_w)
+        for idx, (pm, cache_key) in enumerate(rendered_pages):
+            self.pixmap_cache[cache_key] = pm
+            lbl = QLabel()
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setContentsMargins(0, 0, 0, 0)
+            lbl.setStyleSheet("border: none; padding: 0px; margin: 0px;")
+            lbl.setPixmap(pm.scaledToWidth(target_w, Qt.TransformationMode.SmoothTransformation))
+            self.strip_layout.addWidget(lbl)
+            self.page_labels.append((start_ch_num, lbl, cache_key))
+
+        self.verticalScrollBar().setValue(0)
+        self.is_restoring_scroll = False
+        self.mode_changed_signal.emit("pdf")
+
+    def _on_cloud_preload_finished(self, next_ch: int):
+        if next_ch in self.loaded_chapters or not self.rolling_cache:
+            return
+        self.loaded_chapters.add(next_ch)
+        self.chapter_modes[next_ch] = "pdf"
+        target_w = int(self.reading_width * self.zoom)
+
+        divider = QLabel(f"━━━   CHAPTER {next_ch} [CLOUD STREAM]   ━━━")
+        divider.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        divider.setStyleSheet("""
+            color: #60a5fa;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 30px 0px 20px 0px;
+            background: transparent;
+        """)
+        self.strip_layout.addWidget(divider)
+
+        pages = self.rolling_cache.rendered_pages.get(next_ch, [])
+        for idx, (pm, cache_key) in enumerate(pages):
+            self.pixmap_cache[cache_key] = pm
+            lbl = QLabel()
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setContentsMargins(0, 0, 0, 0)
+            lbl.setStyleSheet("border: none; padding: 0px; margin: 0px;")
+            lbl.setPixmap(pm.scaledToWidth(target_w, Qt.TransformationMode.SmoothTransformation))
+            self.strip_layout.addWidget(lbl)
+            self.page_labels.append((next_ch, lbl, cache_key))
 
     def append_chapter(self, ch_num: int):
         if ch_num in self.loaded_chapters:
@@ -1894,7 +2806,9 @@ class WebtoonScrollCanvas(QScrollArea):
 
         ratio = value / max_scroll
 
-        if ratio >= self.cfg.get("auto_preload_threshold", 0.67):
+        if self.is_cloud_mode and self.rolling_cache:
+            self.rolling_cache.on_scroll_threshold_reached(self.active_ch_num, ratio)
+        elif ratio >= self.cfg.get("auto_preload_threshold", 0.67):
             next_ch = self.active_ch_num + 1
             if next_ch not in self.loaded_chapters:
                 self.append_chapter(next_ch)
@@ -1940,6 +2854,13 @@ class ManhwaApp(QMainWindow):
         self.current_reading_manhwa = ""
         self.current_reading_chapter = 1
         self.is_zen_mode = False
+        self.catalog_view_mode = "local"
+        self.is_cloud_reading = False
+        self.search_query = ""
+        self.filter_lang = "ALL"
+        self.filter_progress = "ALL"
+        self.stream_client = TelegramStreamClient()
+        self.current_cloud_worker: Optional[StreamDownloadThread] = None
 
         self.init_window_properties()
         self.init_ui()
@@ -2031,10 +2952,30 @@ class ManhwaApp(QMainWindow):
         self.tab_settings_btn.setCheckable(True)
         self.tab_settings_btn.clicked.connect(lambda: self.switch_tab(3))
 
+        self.tab_translate_btn = QPushButton(self.t.get("btn_translate_nav", "⚔️ Translate"))
+        self.tab_translate_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.tab_translate_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #8b5cf6, stop:1 #6d28d9);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 13px;
+                border: 1px solid rgba(167, 139, 250, 0.5);
+                border-radius: 9px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #a78bfa, stop:1 #7c3aed);
+                border-color: #c4b5fd;
+            }
+        """)
+        self.tab_translate_btn.clicked.connect(self.launch_overlay_translator)
+
         nav_layout.addWidget(self.tab_catalog_btn)
         nav_layout.addWidget(self.tab_reader_btn)
         nav_layout.addWidget(self.tab_downloader_btn)
         nav_layout.addWidget(self.tab_settings_btn)
+        nav_layout.addWidget(self.tab_translate_btn)
         nav_layout.addStretch()
 
         self.root_layout.addWidget(self.nav_frame)
@@ -2058,12 +2999,16 @@ class ManhwaApp(QMainWindow):
     # -----------------------------------------------------------------------
     # TAB 0: CATALOG
     # -----------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # TAB 0: CATALOG
+    # -----------------------------------------------------------------------
     def create_catalog_page(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
+        # Top Bar: Title + Refresh + Add TG
         top_bar = QHBoxLayout()
         self.cat_title = QLabel(self.t["lib_title"])
         self.cat_title.setStyleSheet("font-size: 18px; font-weight: 700; color: #f3f4f6;")
@@ -2084,6 +3029,126 @@ class ManhwaApp(QMainWindow):
 
         layout.addLayout(top_bar)
 
+        # Segmented Controls Bar: Switcher (Local/Cloud) + Elegant Dark Fantasy Search Bar + Filter Dropdowns
+        sub_bar = QHBoxLayout()
+        sub_bar.setSpacing(10)
+
+        self.btn_mode_local = QPushButton(self.t.get("cat_tab_local", "📚 Локальна бібліотека"))
+        self.btn_mode_local.setCheckable(True)
+        self.btn_mode_local.setChecked(True)
+        self.btn_mode_local.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_mode_local.setStyleSheet("""
+            QPushButton {
+                background-color: #121824;
+                color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 6px 14px;
+                font-weight: 700;
+                font-size: 12px;
+            }
+            QPushButton:checked {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F59E0B, stop:1 #D97706);
+                color: #000000;
+                border-color: #F59E0B;
+                font-weight: 800;
+            }
+        """)
+        self.btn_mode_local.clicked.connect(lambda: self.set_catalog_mode("local"))
+        sub_bar.addWidget(self.btn_mode_local)
+
+        self.btn_mode_cloud = QPushButton(self.t.get("cat_tab_cloud", "☁️ Моя Хмара Telegram"))
+        self.btn_mode_cloud.setCheckable(True)
+        self.btn_mode_cloud.setChecked(False)
+        self.btn_mode_cloud.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_mode_cloud.setStyleSheet("""
+            QPushButton {
+                background-color: #121824;
+                color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 6px 14px;
+                font-weight: 700;
+                font-size: 12px;
+            }
+            QPushButton:checked {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3B82F6, stop:1 #1D4ED8);
+                color: #FFFFFF;
+                border-color: #60A5FA;
+                font-weight: 800;
+            }
+        """)
+        self.btn_mode_cloud.clicked.connect(lambda: self.set_catalog_mode("cloud"))
+        sub_bar.addWidget(self.btn_mode_cloud)
+
+        self.btn_mode_novels = QPushButton(self.t.get("cat_tab_novels", "📖 Новели / Ранобе"))
+        self.btn_mode_novels.setCheckable(True)
+        self.btn_mode_novels.setChecked(False)
+        self.btn_mode_novels.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_mode_novels.setStyleSheet("""
+            QPushButton {
+                background-color: #121824;
+                color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                padding: 6px 14px;
+                font-weight: 700;
+                font-size: 12px;
+            }
+            QPushButton:checked {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #10B981, stop:1 #047857);
+                color: #FFFFFF;
+                border-color: #34D399;
+                font-weight: 800;
+            }
+        """)
+        self.btn_mode_novels.clicked.connect(lambda: self.set_catalog_mode("novels"))
+        self.btn_mode_novels.hide()  # Hidden by default until a novel is present
+        sub_bar.addWidget(self.btn_mode_novels)
+
+        # Elegant Dark Fantasy Real-Time Search Bar
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText(self.t.get("search_ph", "🔍 Пошук тайтлів..."))
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(15, 18, 26, 0.85);
+                color: #ffffff;
+                border: 1.5px solid rgba(245, 158, 11, 0.45);
+                border-radius: 9px;
+                padding: 6px 12px;
+                font-size: 13px;
+                font-weight: 600;
+                min-width: 220px;
+            }
+            QLineEdit:hover {
+                border-color: rgba(245, 158, 11, 0.80);
+                background-color: rgba(20, 24, 34, 0.95);
+            }
+            QLineEdit:focus {
+                border: 1.5px solid #fbbf24;
+                background-color: #141824;
+            }
+        """)
+        self.search_input.textChanged.connect(self._on_search_text_changed)
+        sub_bar.addWidget(self.search_input, 1)
+
+        # Language Filter Dropdown
+        self.filter_lang_combo = QComboBox()
+        self._populate_lang_filter()
+        apply_combo_style(self.filter_lang_combo)
+        self.filter_lang_combo.currentIndexChanged.connect(self._on_filter_changed)
+        sub_bar.addWidget(self.filter_lang_combo)
+
+        # Reading Progress Filter Dropdown
+        self.filter_prog_combo = QComboBox()
+        self._populate_prog_filter()
+        apply_combo_style(self.filter_prog_combo)
+        self.filter_prog_combo.currentIndexChanged.connect(self._on_filter_changed)
+        sub_bar.addWidget(self.filter_prog_combo)
+
+        layout.addLayout(sub_bar)
+
         self.catalog_scroll = QScrollArea()
         self.catalog_scroll.setWidgetResizable(True)
         self.catalog_scroll.setStyleSheet("background: transparent; border: none;")
@@ -2100,13 +3165,164 @@ class ManhwaApp(QMainWindow):
 
         return widget
 
+    def _populate_lang_filter(self):
+        self.filter_lang_combo.blockSignals(True)
+        self.filter_lang_combo.clear()
+        self.filter_lang_combo.addItem(self.t.get("filter_lang_all", "Всі мови"), "ALL")
+        self.filter_lang_combo.addItem(self.t.get("filter_lang_ua", "🇺🇦 UA"), "UA")
+        self.filter_lang_combo.addItem(self.t.get("filter_lang_en", "🇬🇧 EN"), "EN")
+        self.filter_lang_combo.addItem(self.t.get("filter_lang_raw", "🌐 RAW"), "RAW")
+        idx = self.filter_lang_combo.findData(self.filter_lang)
+        if idx >= 0:
+            self.filter_lang_combo.setCurrentIndex(idx)
+        self.filter_lang_combo.blockSignals(False)
+
+    def _populate_prog_filter(self):
+        self.filter_prog_combo.blockSignals(True)
+        self.filter_prog_combo.clear()
+        self.filter_prog_combo.addItem(self.t.get("filter_prog_all", "Весь прогрес"), "ALL")
+        self.filter_prog_combo.addItem(self.t.get("filter_prog_reading", "📖 Читаю"), "READING")
+        self.filter_prog_combo.addItem(self.t.get("filter_prog_completed", "✅ Прочитано"), "COMPLETED")
+        self.filter_prog_combo.addItem(self.t.get("filter_prog_unread", "⏳ Непочаті"), "UNREAD")
+        idx = self.filter_prog_combo.findData(self.filter_progress)
+        if idx >= 0:
+            self.filter_prog_combo.setCurrentIndex(idx)
+        self.filter_prog_combo.blockSignals(False)
+
+    def _on_search_text_changed(self, text: str):
+        self.search_query = text.strip()
+        self.refresh_catalog()
+
+    def _on_filter_changed(self):
+        self.filter_lang = self.filter_lang_combo.currentData() or "ALL"
+        self.filter_progress = self.filter_prog_combo.currentData() or "ALL"
+        self.refresh_catalog()
+
+    def set_catalog_mode(self, mode: str):
+        self.catalog_view_mode = mode
+        if mode == "local":
+            self.btn_mode_local.setChecked(True)
+            self.btn_mode_cloud.setChecked(False)
+            if hasattr(self, "btn_mode_novels"):
+                self.btn_mode_novels.setChecked(False)
+            self.cat_title.setText(self.t["lib_title"])
+        elif mode == "cloud":
+            self.btn_mode_local.setChecked(False)
+            self.btn_mode_cloud.setChecked(True)
+            if hasattr(self, "btn_mode_novels"):
+                self.btn_mode_novels.setChecked(False)
+            self.cat_title.setText(self.t.get("cloud_vault_title", "Хмарне сховище"))
+        elif mode == "novels":
+            self.btn_mode_local.setChecked(False)
+            self.btn_mode_cloud.setChecked(False)
+            if hasattr(self, "btn_mode_novels"):
+                self.btn_mode_novels.setChecked(True)
+            self.cat_title.setText(self.t.get("cat_tab_novels", "📖 Новели / Ранобе"))
+        self.refresh_catalog()
+
+    def _get_cloud_index_data(self) -> dict:
+        """Cached / safe access to cloud_index.json."""
+        return load_cloud_index()
+
+    def _resolve_linked_translations(self, title_key: str, cloud_titles: dict) -> List[dict]:
+        """Resolves cross-language translations from cloud index and local library."""
+        norm_key = normalize_search_text(title_key)
+        for code, info in cloud_titles.items():
+            candidates = [code, info.get("title_name", "")]
+            candidates.extend(info.get("aliases", []))
+            for cand in candidates:
+                if normalize_search_text(cand) == norm_key or norm_key in normalize_search_text(cand) or normalize_search_text(cand) in norm_key:
+                    return info.get("linked_translations", [])
+        return []
+
+    def _resolve_aliases(self, title_key: str, cloud_titles: dict) -> List[str]:
+        """Returns aliases list for a given manhwa title from cloud index if present."""
+        norm_key = normalize_search_text(title_key)
+        for code, info in cloud_titles.items():
+            candidates = [code, info.get("title_name", "")]
+            candidates.extend(info.get("aliases", []))
+            for cand in candidates:
+                if normalize_search_text(cand) == norm_key or norm_key in normalize_search_text(cand) or normalize_search_text(cand) in norm_key:
+                    return info.get("aliases", [])
+        return []
+
+    def _matches_progress(self, bm: dict, total_chapters: int) -> bool:
+        if self.filter_progress == "ALL":
+            return True
+        if total_chapters <= 0:
+            return self.filter_progress == "UNREAD"
+        if not bm:
+            return self.filter_progress == "UNREAD"
+
+        ch_num = bm.get("chapter", 0)
+        prog = bm.get("chapter_progress", 0.0)
+
+        if self.filter_progress == "UNREAD":
+            return ch_num <= 1 and prog < 0.05
+        elif self.filter_progress == "COMPLETED":
+            return ch_num >= total_chapters and prog >= 0.85
+        elif self.filter_progress == "READING":
+            is_unread = (ch_num <= 1 and prog < 0.05)
+            is_completed = (ch_num >= total_chapters and prog >= 0.85)
+            return not is_unread and not is_completed
+        return True
+
+    def _matches_lang(self, title_name: str, item_lang: Optional[str] = None) -> bool:
+        if self.filter_lang == "ALL":
+            return True
+        fl = self.filter_lang.upper()
+
+        if item_lang:
+            norm_item = item_lang.strip().upper()
+            if fl in norm_item:
+                return True
+
+        t_upper = title_name.upper()
+        if fl == "UA" and ("[UA]" in t_upper or "(UA)" in t_upper or re.search(r'[а-яіїєґ]', title_name, re.I)):
+            return True
+        if fl == "EN" and ("[EN]" in t_upper or "(EN)" in t_upper or not re.search(r'[а-яіїєґ]', title_name, re.I)):
+            return True
+        if fl == "RAW" and ("[RAW]" in t_upper or "(RAW)" in t_upper or "RAW" in t_upper):
+            return True
+        return False
+
+    def on_switch_translation(self, trans_item: dict):
+        """Switches view to the target translation."""
+        t_type = trans_item.get("type", "local")
+        target = trans_item.get("target") or trans_item.get("title", "")
+        if t_type == "cloud":
+            if self.catalog_view_mode != "cloud":
+                self.set_catalog_mode("cloud")
+            self.search_input.setText(target)
+        else:
+            if self.catalog_view_mode != "local":
+                self.set_catalog_mode("local")
+            self.search_input.setText(target)
+
     def refresh_catalog(self):
         while self.cards_grid.count():
             item = self.cards_grid.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        manhwas = [p for p in self.lib_dir.iterdir() if p.is_dir() and not p.name.startswith(".")]
+        # Check if any novels exist in novels_library or library/Novels*
+        has_novels = self._has_any_novels()
+        if hasattr(self, "btn_mode_novels"):
+            self.btn_mode_novels.setVisible(has_novels)
+
+        if getattr(self, "catalog_view_mode", "local") == "cloud":
+            self.refresh_cloud_catalog()
+            return
+        elif getattr(self, "catalog_view_mode", "local") == "novels":
+            self.refresh_novels_catalog()
+            return
+
+        manhwas = [
+            p for p in self.lib_dir.iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+            and p.name != "novels_library"
+            and not p.name.lower().startswith("novel")
+        ]
 
         if not manhwas:
             empty_lbl = QLabel(self.t["empty_lib"])
@@ -2117,16 +3333,337 @@ class ManhwaApp(QMainWindow):
 
         cols = max(1, self.width() // 280)
         bookmarks = self.cfg.get("bookmarks", {})
+        cloud_data = self._get_cloud_index_data()
+        cloud_titles = cloud_data.get("titles", {})
 
-        for idx, m_path in enumerate(manhwas):
-            bm = bookmarks.get(m_path.name, {})
-            card = ManhwaCard(m_path.name, m_path, bm, self.t)
+        displayed_count = 0
+        for m_path in manhwas:
+            m_name = m_path.name
+            aliases = self._resolve_aliases(m_name, cloud_titles)
+
+            # Search query matching
+            if self.search_query:
+                if not matches_search_query(self.search_query, m_name, aliases):
+                    continue
+
+            # Calculate chapter count for progress filter
+            temp_card = ManhwaCard(m_name, m_path, {}, self.t)
+            total_chs = temp_card.get_chapter_count()
+            temp_card.deleteLater()
+
+            bm = bookmarks.get(m_name, {})
+            if not self._matches_progress(bm, total_chs):
+                continue
+
+            if not self._matches_lang(m_name, None):
+                continue
+
+            linked_trans = self._resolve_linked_translations(m_name, cloud_titles)
+            card = ManhwaCard(m_name, m_path, bm, self.t, linked_translations=linked_trans)
             card.read_clicked.connect(self.open_manhwa_reader)
             card.delete_clicked.connect(self.confirm_delete_manhwa)
+            card.switch_translation_clicked.connect(self.on_switch_translation)
 
-            row = idx // cols
-            col = idx % cols
+            row = displayed_count // cols
+            col = displayed_count % cols
             self.cards_grid.addWidget(card, row, col)
+            displayed_count += 1
+
+        if displayed_count == 0 and manhwas:
+            empty_lbl = QLabel(f"🔍 {self.t.get('cloud_empty', 'Не знайдено тайтлів за запитом.')}")
+            empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_lbl.setStyleSheet("color: #fbbf24; font-size: 15px; padding: 60px; font-weight: 600;")
+            self.cards_grid.addWidget(empty_lbl, 0, 0)
+
+    def refresh_cloud_catalog(self):
+        cloud_data = self._get_cloud_index_data()
+        titles = cloud_data.get("titles", {})
+
+        if not titles:
+            empty_lbl = QLabel(self.t.get("cloud_empty", "☁️ У вашому хмарному сховищі поки немає збережених глав."))
+            empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_lbl.setStyleSheet("color: #93C5FD; font-size: 15px; padding: 60px;")
+            self.cards_grid.addWidget(empty_lbl, 0, 0)
+            return
+
+        cols = max(1, self.width() // 280)
+        bookmarks = self.cfg.get("bookmarks", {})
+
+        displayed_count = 0
+        for title, info in titles.items():
+            full_title = info.get("title_name") or title
+            aliases = info.get("aliases", [])
+
+            # Search query matching
+            if self.search_query:
+                if not matches_search_query(self.search_query, full_title, aliases + [title]):
+                    continue
+
+            chapters = info.get("chapters", {})
+            total_chs = len(chapters)
+            bm = bookmarks.get(title, {})
+
+            if not self._matches_progress(bm, total_chs):
+                continue
+
+            item_lang = info.get("lang")
+            if not self._matches_lang(full_title, item_lang):
+                continue
+
+            linked_trans = info.get("linked_translations", [])
+            card = CloudManhwaCard(title, info, bm, self.t, linked_translations=linked_trans)
+            card.read_cloud_clicked.connect(self.open_cloud_manhwa_reader)
+            card.download_cloud_clicked.connect(self.open_cloud_download_dialog)
+            card.switch_translation_clicked.connect(self.on_switch_translation)
+
+            row = displayed_count // cols
+            col = displayed_count % cols
+            self.cards_grid.addWidget(card, row, col)
+    def _has_any_novels(self) -> bool:
+        """Checks if there are any novels downloaded locally."""
+        novels_dir = self.lib_dir / "novels_library"
+        if novels_dir.exists() and any(novels_dir.iterdir()):
+            return True
+        for p in self.lib_dir.iterdir():
+            if p.is_dir() and "novel" in p.name.lower():
+                return True
+        return False
+
+    def refresh_novels_catalog(self):
+        """Renders novel/light novel cards in catalog."""
+        novels_dir = self.lib_dir / "novels_library"
+        candidate_dirs = []
+        if novels_dir.exists():
+            candidate_dirs.extend([p for p in novels_dir.iterdir() if not p.name.startswith(".")])
+        for p in self.lib_dir.iterdir():
+            if p.is_dir() and "novel" in p.name.lower() and p != novels_dir:
+                candidate_dirs.append(p)
+
+        if not candidate_dirs:
+            empty_lbl = QLabel("📖 У Бібліотеці Новел поки що немає тайтлів.\nЗавантажте розділи через '⚡ TG Downloader' з галочкою 'Новела / Ранобе'.")
+            empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_lbl.setStyleSheet("color: #34D399; font-size: 15px; padding: 60px; font-weight: 600;")
+            self.cards_grid.addWidget(empty_lbl, 0, 0)
+            return
+
+        cols = max(1, self.width() // 280)
+        bookmarks = self.cfg.get("bookmarks", {})
+
+        displayed_count = 0
+        for n_path in candidate_dirs:
+            n_name = n_path.name
+            if self.search_query and self.search_query.lower() not in n_name.lower():
+                continue
+
+            bm = bookmarks.get(n_name, {})
+            card = ManhwaCard(n_name, n_path, bm, self.t)
+            card.read_clicked.connect(lambda name, p=n_path: self.open_novel_reader(name, p))
+            card.delete_clicked.connect(self.confirm_delete_manhwa)
+
+            row = displayed_count // cols
+            col = displayed_count % cols
+            self.cards_grid.addWidget(card, row, col)
+            displayed_count += 1
+
+    def open_novel_reader(self, novel_name: str, novel_path: Path):
+        """Opens dedicated embedded Novel Reader inside the same window."""
+        if not hasattr(self, "novel_reader_widget") or self.novel_reader_widget is None:
+            if NovelReaderWindow is not None:
+                self.novel_reader_widget = NovelReaderWindow(self, t=self.t)
+                self.novel_reader_widget.back_to_library_requested.connect(lambda: self.switch_tab(0))
+                self.novel_reader_widget.progress_changed.connect(self._on_novel_progress_changed)
+                self.stack.addWidget(self.novel_reader_widget)
+            else:
+                err_title = self.t.get("log_error_tag", "Error").strip("[]")
+                NoticeDialog(
+                    err_title,
+                    self.t.get("novel_load_err", "Failed to load novel reader module."),
+                    btn_text=self.t.get("ok_btn", "OK"),
+                    parent=self
+                ).exec()
+                return
+
+        if hasattr(self.novel_reader_widget, "set_translations"):
+            self.novel_reader_widget.set_translations(self.t)
+        self.novel_reader_widget.load_novel(novel_path, novel_name)
+        # Switch to the novel reader page in stack
+        self.stack.setCurrentWidget(self.novel_reader_widget)
+
+    def _on_novel_progress_changed(self, novel_name: str, ch_idx: int, percent: float):
+        if "bookmarks" not in self.cfg:
+            self.cfg["bookmarks"] = {}
+        self.cfg["bookmarks"][novel_name] = {
+            "chapter": ch_idx + 1,
+            "chapter_progress": percent / 100.0,
+            "scroll_y": 0
+        }
+        save_config(self.cfg)
+
+    def open_cloud_download_dialog(self, title_code: Optional[str] = None):
+        code = title_code or self.current_reading_manhwa
+        if not code:
+            return
+
+        cloud_data = load_cloud_index()
+        title_info = cloud_data.get("titles", {}).get(code, {})
+        current_ch = self.canvas.active_ch_num if self.is_cloud_reading else 1
+
+        dlg = SingleChapterDownloadDialog(code, title_info, current_ch, self.lib_dir, t=self.t, parent=self)
+        dlg.download_requested.connect(self.run_cloud_download)
+        dlg.exec()
+
+    def run_cloud_download(self, title_code: str, pc_folder_name: str, ch_filter: str):
+        cloud_data = load_cloud_index()
+        title_info = cloud_data.get("titles", {}).get(title_code, {})
+        vault_target = cloud_data.get("vault_channel_id") or cloud_data.get("vault_channel", -1004386061072)
+
+        self.cloud_dl_worker = CloudDownloadWorker(
+            self.stream_client, vault_target, title_code, title_info, pc_folder_name, ch_filter, self.lib_dir, t=self.t
+        )
+
+        def _on_status(msg):
+            if hasattr(self, "dl_log"):
+                self.dl_log.append(f"• {msg}")
+            if self.is_cloud_reading:
+                self.reader_title_lbl.setText(f"📥 {msg[:35]}")
+
+        def _on_finished(ok, msg):
+            if hasattr(self, "dl_log"):
+                tag = self.t.get("log_success_tag", "[УСПІХ]") if ok else self.t.get("log_error_tag", "[ПОМИЛКА]")
+                self.dl_log.append(f"\n{tag} {msg}")
+            if ok:
+                self.refresh_catalog()
+                NoticeDialog(
+                    self.t.get("notice_dl_success_title", "Завантаження завершено"),
+                    msg,
+                    btn_text=self.t.get("notice_dl_success_btn", "Чудово"),
+                    parent=self
+                ).exec()
+            else:
+                NoticeDialog(
+                    self.t.get("notice_dl_error_title", "Помилка завантаження"),
+                    msg,
+                    btn_text=self.t.get("notice_dl_error_btn", "Зрозуміло"),
+                    parent=self
+                ).exec()
+
+        self.cloud_dl_worker.status_signal.connect(_on_status)
+        self.cloud_dl_worker.finished_signal.connect(_on_finished)
+        self.cloud_dl_worker.start()
+
+    def open_cloud_manhwa_reader(self, title: str, force_ch: Optional[int] = None):
+        self.current_reading_manhwa = title
+        self.is_cloud_reading = True
+        self.mode_toggle_btn.setText(self.t.get("reader_cloud_dl_btn", "📥 Завантажити PDF"))
+        self.mode_toggle_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2563EB, stop:1 #1D4ED8);
+                border: 1px solid #60A5FA;
+                color: #FFFFFF;
+                font-weight: 700;
+                font-size: 12px;
+                padding: 5px 12px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3B82F6, stop:1 #2563EB);
+                border-color: #93C5FD;
+            }
+        """)
+
+        cloud_data = load_cloud_index()
+        title_info = cloud_data.get("titles", {}).get(title, {})
+        chapters_dict = title_info.get("chapters", {})
+
+        ch_map = {}
+        for ch_k, ch_val in chapters_dict.items():
+            try:
+                ch_num = int(ch_k)
+                msg_id = ch_val.get("vault_msg_id") or ch_val.get("message_id")
+                ch_map[ch_num] = msg_id
+            except Exception:
+                pass
+
+        sorted_chapters = sorted(list(ch_map.keys()))
+        if not sorted_chapters:
+            sorted_chapters = [1]
+
+        ch_word = "Ch." if self.lang == "en" else "Глава"
+        self.chapter_combo.blockSignals(True)
+        self.chapter_combo.clear()
+        for c_num in sorted_chapters:
+            self.chapter_combo.addItem(f"{ch_word} {c_num} [☁️]", c_num)
+        self.chapter_combo.blockSignals(False)
+
+        bm = self.cfg.get("bookmarks", {}).get(title, {})
+        start_ch = force_ch or bm.get("chapter", sorted_chapters[0])
+
+        idx = self.chapter_combo.findData(start_ch)
+        if idx >= 0:
+            self.chapter_combo.blockSignals(True)
+            self.chapter_combo.setCurrentIndex(idx)
+            self.chapter_combo.blockSignals(False)
+
+        full_name = title_info.get("title_name") or title
+        self.reader_title_lbl.setText(f"☁️ {full_name}")
+        self.switch_tab(1)
+
+        self.load_cloud_chapter(title, start_ch)
+
+    def load_cloud_chapter(self, title: str, ch_num: int):
+        cloud_data = load_cloud_index()
+        title_info = cloud_data.get("titles", {}).get(title, {})
+        chapters_dict = title_info.get("chapters", {})
+
+        ch_map = {}
+        for ch_k, ch_val in chapters_dict.items():
+            try:
+                c_n = int(ch_k)
+                ch_map[c_n] = ch_val.get("vault_msg_id") or ch_val.get("message_id")
+            except Exception:
+                pass
+
+        target_msg_id = ch_map.get(ch_num)
+        target_vault = cloud_data.get("vault_channel_id") or cloud_data.get("vault_channel", "https://t.me/+O6mlGVWzTSQ5MjVi")
+        full_name = title_info.get("title_name") or title
+
+        # Cancel any previous active cloud download worker to avoid crashes
+        if self.current_cloud_worker and self.current_cloud_worker.isRunning():
+            try:
+                self.current_cloud_worker.cancel()
+                self.current_cloud_worker.quit()
+                self.current_cloud_worker.wait(300)
+            except Exception:
+                pass
+
+        if not target_msg_id:
+            self.canvas.show_cloud_error(ch_num, f"Главу {ch_num} не знайдено в хмарному сховищі.")
+            return
+
+        self.canvas.show_cloud_progress(ch_num, 0.0, 0, 0)
+        self.reader_title_lbl.setText(f"☁️ {full_name} — Глава {ch_num} (RAM стрімінг)")
+
+        worker = StreamDownloadThread(self.stream_client, target_vault, ch_num, target_msg_id)
+        self.current_cloud_worker = worker
+
+        def _on_progress(c_n, pct, cur, tot):
+            if c_n == ch_num:
+                self.canvas.show_cloud_progress(c_n, pct, cur, tot)
+
+        def _on_loaded(c_n, data):
+            if c_n == ch_num:
+                self.reader_title_lbl.setText(f"☁️ {full_name} — Ch. {ch_num}")
+                self.canvas.load_cloud_stream_chapter(title, c_n, data, ch_map, self.stream_client)
+
+        def _on_error(c_n, err):
+            if c_n == ch_num:
+                self.reader_title_lbl.setText(f"⚠️ Помилка: {err[:30]}")
+                self.canvas.show_cloud_error(c_n, err)
+
+        worker.progress_signal.connect(_on_progress)
+        worker.finished_signal.connect(_on_loaded)
+        worker.error_signal.connect(_on_error)
+        worker.start()
 
     def confirm_delete_manhwa(self, manhwa_name: str):
         dlg = ConfirmDeleteDialog(self.t["del_confirm_title"], manhwa_name, self.t, self)
@@ -2275,6 +3812,9 @@ class ManhwaApp(QMainWindow):
         return widget
 
     def on_reader_mode_changed(self, mode: str):
+        if self.is_cloud_reading:
+            self.mode_toggle_btn.setText(self.t.get("reader_cloud_dl_btn", "📥 Завантажити PDF"))
+            return
         if mode == "pdf":
             self.mode_toggle_btn.setText(self.t["read_in_jpeg"])
         else:
@@ -2283,6 +3823,10 @@ class ManhwaApp(QMainWindow):
     def toggle_reader_mode(self):
         if not self.current_reading_manhwa:
             return
+        if self.is_cloud_reading:
+            self.open_cloud_download_dialog(self.current_reading_manhwa)
+            return
+
         ch_num = self.canvas.active_ch_num
         m_path = self.lib_dir / self.current_reading_manhwa
         current_mode = self.canvas.active_mode
@@ -2343,6 +3887,7 @@ class ManhwaApp(QMainWindow):
 
     def open_manhwa_reader(self, manhwa_name: str, force_ch: Optional[int] = None):
         self.current_reading_manhwa = manhwa_name
+        self.is_cloud_reading = False
         m_path = self.lib_dir / manhwa_name
         if not m_path.exists():
             return
@@ -2380,14 +3925,32 @@ class ManhwaApp(QMainWindow):
             self.chapter_combo.blockSignals(False)
 
         self.reader_title_lbl.setText(f"📖 {manhwa_name}")
+        self.mode_toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1a202e;
+                border: 1px solid rgba(251, 191, 36, 0.45);
+                color: #fbbf24;
+                font-weight: 700;
+                font-size: 12px;
+                padding: 5px 10px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba(251, 191, 36, 0.18);
+                border-color: #fbbf24;
+            }
+        """)
         self.switch_tab(1)
         self.canvas.load_manhwa_chapter(m_path, start_ch, saved_scroll_y)
 
     def on_chapter_combo_change(self, idx: int):
         ch_num = self.chapter_combo.currentData()
         if ch_num and self.current_reading_manhwa:
-            m_path = self.lib_dir / self.current_reading_manhwa
-            self.canvas.load_manhwa_chapter(m_path, ch_num, 0)
+            if self.is_cloud_reading:
+                self.load_cloud_chapter(self.current_reading_manhwa, ch_num)
+            else:
+                m_path = self.lib_dir / self.current_reading_manhwa
+                self.canvas.load_manhwa_chapter(m_path, ch_num, 0)
 
     def prev_chapter(self):
         curr_idx = self.chapter_combo.currentIndex()
@@ -2458,15 +4021,13 @@ class ManhwaApp(QMainWindow):
         top_auth_row.addWidget(self.dl_card_title)
         top_auth_row.addStretch()
 
-        self.auth_status_lbl = QLabel(self.t["auth_needed"])
-        self.auth_status_lbl.setStyleSheet("color: #fbbf24; font-size: 13px; font-weight: 600;")
+        self.auth_status_lbl = QLabel(self.t.get("auth_ok", "🟢 Telegram Бот підключено"))
+        self.auth_status_lbl.setStyleSheet("color: #34d399; font-size: 13px; font-weight: 700;")
         top_auth_row.addWidget(self.auth_status_lbl)
 
+        # Bot token is built-in and protected from accidental modification
         self.auth_btn = QPushButton(self.t["auth_btn"])
-        self.auth_btn.setProperty("class", "btnSecondary")
-        self.auth_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.auth_btn.clicked.connect(self.open_telegram_auth)
-        top_auth_row.addWidget(self.auth_btn)
+        self.auth_btn.hide()
 
         card_layout.addLayout(top_auth_row)
         self.check_auth_status()
@@ -2521,11 +4082,40 @@ class ManhwaApp(QMainWindow):
         self.dl_title_inp.setPlaceholderText(self.t["dl_name_ph"])
         form_grid.addWidget(self.dl_title_inp, 3, 1)
 
+        self.lbl_dl_lang = QLabel(self.t.get("dl_lang", "Мова перекладу тайтлу:"))
+        form_grid.addWidget(self.lbl_dl_lang, 4, 0)
+        self.dl_lang_combo = QComboBox()
+        self.dl_lang_combo.addItem(self.t.get("dl_lang_auto", "Авто-визначення"), "AUTO")
+        self.dl_lang_combo.addItem("🇺🇦 UK (Українська)", "UA")
+        self.dl_lang_combo.addItem("🇬🇧 EN (English)", "EN")
+        self.dl_lang_combo.addItem("🇷🇺 RU (Русский)", "RU")
+        self.dl_lang_combo.addItem("🌐 OTHER (Інша / RAW)", "OTHER")
+        apply_combo_style(self.dl_lang_combo)
+        form_grid.addWidget(self.dl_lang_combo, 4, 1)
+
+        self.lbl_dl_version = QLabel("При дублікатах глав:")
+        form_grid.addWidget(self.lbl_dl_version, 5, 0)
+        self.dl_version_combo = QComboBox()
+        self.dl_version_combo.addItem("⚡ Завантажувати новіші (найсвіжіший реліз / перезапуск)", "newest")
+        self.dl_version_combo.addItem("📦 Завантажувати старіші (перші оригінальні випуски)", "oldest")
+        self.dl_version_combo.addItem("📁 Завантажувати всі версії без пропуску", "all")
+        apply_combo_style(self.dl_version_combo)
+        form_grid.addWidget(self.dl_version_combo, 5, 1)
+
         card_layout.addLayout(form_grid)
 
         # Neon Toggles (Brawl Stars Drafter style)
         toggles_box = QVBoxLayout()
         toggles_box.setSpacing(10)
+
+        # Novel / Light Novel Toggle (Placed higher with small subtitle hint)
+        self.novel_mode_toggle = NeoToggle(
+            self.t.get("toggle_novel_mode_title", "Новела / Ранобе (EPUB / DOCX / TXT)"),
+            self.t.get("toggle_novel_mode_sub", "Зберігати глави тексту в окрему Бібліотеку Новел для читання"),
+            checked=self.cfg.get("download_as_novel", False)
+        )
+        self.novel_mode_toggle.toggled.connect(self._on_novel_mode_toggled)
+        toggles_box.addWidget(self.novel_mode_toggle)
 
         self.extract_jpeg_toggle = NeoToggle(
             self.t["toggle_extract_jpeg_title"],
@@ -2613,6 +4203,10 @@ class ManhwaApp(QMainWindow):
         scroll_wrapper.setWidget(inner_widget)
         return scroll_wrapper
 
+    def _on_novel_mode_toggled(self, val: bool):
+        self.cfg["download_as_novel"] = val
+        save_config(self.cfg)
+
     def _on_extract_jpeg_toggled(self, val: bool):
         self.cfg["extract_to_jpeg"] = val
         save_config(self.cfg)
@@ -2655,6 +4249,12 @@ class ManhwaApp(QMainWindow):
 
         if not title:
             title = kw or "Downloaded_Manhwa"
+
+        selected_lang = self.dl_lang_combo.currentData() if hasattr(self, "dl_lang_combo") else "AUTO"
+        if selected_lang and selected_lang != "AUTO":
+            tag = f"[{selected_lang}]"
+            if tag not in title and f"({selected_lang})" not in title:
+                title = f"{title} {tag}"
 
         self.dl_start_btn.setEnabled(False)
         self.dl_prog.setValue(0)
@@ -2699,9 +4299,12 @@ class ManhwaApp(QMainWindow):
             elif choice == "skip":
                 force_redownload = False
 
+        is_novel = self.novel_mode_toggle.isChecked() if hasattr(self, "novel_mode_toggle") else False
+        dup_mode = self.dl_version_combo.currentData() if hasattr(self, "dl_version_combo") else "newest"
         self.worker = DownloadWorker(
             api_id, api_hash, channel, kw, range_s, title, self.lib_dir,
-            extract_to_jpeg, del_pdf, t=self.t, force_redownload=force_redownload
+            extract_to_jpeg, del_pdf, t=self.t, force_redownload=force_redownload,
+            is_novel=is_novel, duplicate_mode=dup_mode
         )
         self.worker.status_signal.connect(lambda s: self.dl_log.append(f"• {s}"))
         self.worker.progress_signal.connect(lambda p: self.dl_prog.setValue(int(p * 100)))
@@ -3016,14 +4619,35 @@ class ManhwaApp(QMainWindow):
             self.tab_downloader_btn.setText(self.t["tab_downloader"])
         if hasattr(self, "tab_settings_btn"):
             self.tab_settings_btn.setText(self.t["tab_settings"])
+        if hasattr(self, "tab_translate_btn"):
+            self.tab_translate_btn.setText(self.t.get("btn_translate_nav", "⚔️ Translate"))
 
         # Tab 0: Catalog
-        if hasattr(self, "cat_title"):
-            self.cat_title.setText(self.t["lib_title"])
+        if getattr(self, "catalog_view_mode", "local") == "cloud":
+            if hasattr(self, "cat_title"):
+                self.cat_title.setText(self.t.get("cloud_vault_title", "Cloud Vault"))
+        elif getattr(self, "catalog_view_mode", "local") == "novels":
+            if hasattr(self, "cat_title"):
+                self.cat_title.setText(self.t.get("cat_tab_novels", "📖 Novels / Light Novels"))
+        else:
+            if hasattr(self, "cat_title"):
+                self.cat_title.setText(self.t["lib_title"])
+        if hasattr(self, "btn_mode_local"):
+            self.btn_mode_local.setText(self.t.get("cat_tab_local", "📚 Local Library"))
+        if hasattr(self, "btn_mode_cloud"):
+            self.btn_mode_cloud.setText(self.t.get("cat_tab_cloud", "☁️ Cloud Vault"))
+        if hasattr(self, "btn_mode_novels"):
+            self.btn_mode_novels.setText(self.t.get("cat_tab_novels", "📖 Novels / Light Novels"))
         if hasattr(self, "refresh_btn"):
             self.refresh_btn.setText(self.t["refresh"])
         if hasattr(self, "add_btn"):
             self.add_btn.setText(self.t["add_tg"])
+        if hasattr(self, "search_input"):
+            self.search_input.setPlaceholderText(self.t.get("search_ph", "🔍 Search titles..."))
+        if hasattr(self, "_populate_lang_filter"):
+            self._populate_lang_filter()
+        if hasattr(self, "_populate_prog_filter"):
+            self._populate_prog_filter()
         self.refresh_catalog()
 
         # Tab 1: Reader
@@ -3036,7 +4660,9 @@ class ManhwaApp(QMainWindow):
         if hasattr(self, "next_ch_btn"):
             self.next_ch_btn.setToolTip(self.t["next_ch"])
         if hasattr(self, "mode_toggle_btn"):
-            if self.canvas.active_mode == "pdf":
+            if self.is_cloud_reading:
+                self.mode_toggle_btn.setText(self.t.get("reader_cloud_dl_btn", "📥 Download PDF"))
+            elif self.canvas.active_mode == "pdf":
                 self.mode_toggle_btn.setText(self.t["read_in_jpeg"])
             else:
                 self.mode_toggle_btn.setText(self.t["read_in_pdf"])
@@ -3073,6 +4699,8 @@ class ManhwaApp(QMainWindow):
             self.lbl_range.setText(self.t["dl_range"])
         if hasattr(self, "lbl_name"):
             self.lbl_name.setText(self.t["dl_name"])
+        if hasattr(self, "lbl_dl_lang"):
+            self.lbl_dl_lang.setText(self.t.get("dl_lang", "Translation Language:"))
         if hasattr(self, "dl_channel_inp"):
             self.dl_channel_inp.setPlaceholderText(self.t["dl_channel_ph"])
         if hasattr(self, "dl_kw_inp"):
@@ -3081,6 +4709,8 @@ class ManhwaApp(QMainWindow):
             self.dl_range_inp.setPlaceholderText(self.t["dl_range_ph"])
         if hasattr(self, "dl_title_inp"):
             self.dl_title_inp.setPlaceholderText(self.t["dl_name_ph"])
+        if hasattr(self, "novel_mode_toggle"):
+            self.novel_mode_toggle.set_texts(self.t["toggle_novel_mode_title"], self.t["toggle_novel_mode_sub"])
         if hasattr(self, "extract_jpeg_toggle"):
             self.extract_jpeg_toggle.set_texts(self.t["toggle_extract_jpeg_title"], self.t["toggle_extract_jpeg_sub"])
         if hasattr(self, "del_pdf_toggle"):
@@ -3111,6 +4741,102 @@ class ManhwaApp(QMainWindow):
             self.unpack_action_btn.setText(self.t["manual_unpack_btn"])
         self._populate_settings_manhwa_list()
 
+        # Embedded Novel Reader tab if active
+        if hasattr(self, "novel_reader_widget") and self.novel_reader_widget is not None:
+            if hasattr(self.novel_reader_widget, "set_translations"):
+                self.novel_reader_widget.set_translations(self.t)
+
+    def launch_overlay_translator(self):
+        """
+        Launches the overlay translator module (main.py or m_translate.exe) in root directory
+        as an independent detached background process.
+        If running inside m_reader_t suite, activates the embedded translator.
+        If not found, displays a stylish Dark Fantasy NoticeDialog.
+        """
+        # 1. If embedded suite translator exists, show its mascot and bubble!
+        if hasattr(self, "suite_translator") and self.suite_translator is not None:
+            try:
+                self.suite_translator.mascot.show()
+                self.suite_translator.toggle_bubble()
+                return
+            except Exception:
+                pass
+
+        if getattr(sys, "frozen", False):
+            # In compiled distribution: look for m_translate.exe in the same folder as this exe
+            project_root = BASE_DIR
+            exe_path = BASE_DIR / "m_translate.exe"
+            if exe_path.exists():
+                found_target = exe_path
+                target_args = [str(exe_path)]
+            else:
+                found_target = None
+        else:
+            # Development mode: check project root
+            project_root = BASE_DIR.parent.resolve()
+            exe_path = project_root / "m_translate.exe"
+            main_py = project_root / "main.py"
+            run_bat = project_root / "run.bat"
+            venv_py = project_root / ".venv" / "Scripts" / "pythonw.exe"
+            if not venv_py.exists():
+                venv_py = project_root / ".venv" / "Scripts" / "python.exe"
+
+            if exe_path.exists():
+                found_target = exe_path
+                target_args = [str(exe_path)]
+            elif main_py.exists():
+                found_target = main_py
+                py_bin = str(venv_py) if venv_py.exists() else sys.executable
+                target_args = [py_bin, str(main_py)]
+            elif run_bat.exists():
+                found_target = run_bat
+                target_args = [str(run_bat)]
+            else:
+                found_target = None
+
+        if found_target:
+            try:
+                # Windows flags for completely detached background process
+                DETACHED_PROCESS = 0x00000008
+                CREATE_NEW_PROCESS_GROUP = 0x00000200
+                creation_flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+                subprocess.Popen(
+                    target_args,
+                    cwd=str(project_root),
+                    creationflags=creation_flags,
+                    close_fds=True
+                )
+            except Exception as e:
+                # Fallback popen
+                try:
+                    subprocess.Popen(target_args, cwd=str(project_root))
+                except Exception as ex:
+                    NoticeDialog(
+                        self.t.get("log_error_tag", "Error").strip("[]"),
+                        f"Failed to launch M_Translate: {ex}",
+                        btn_text=self.t.get("ok_btn", "OK"),
+                        parent=self
+                    ).exec()
+        else:
+            # Show stylish Dark Fantasy Notice Dialog
+            tg_channel_url = "https://t.me/lm_reader"
+            cloud_index = self._get_cloud_index_data()
+            if cloud_index.get("vault_channel"):
+                tg_channel_url = cloud_index.get("vault_channel")
+
+            dlg = NoticeDialog(
+                title=self.t.get("translate_not_found_title", "M_Translate Module Not Found!"),
+                message=self.t.get(
+                    "translate_not_found_msg",
+                    "You do not have the Translate module installed. Visit our official Telegram channel to download the full version of the application."
+                ),
+                btn_text=self.t.get("ok_btn", "OK"),
+                action_btn_text=self.t.get("telegram_open_btn", "✈️ Open Telegram Channel"),
+                on_action_click=lambda: QDesktopServices.openUrl(QUrl("https://t.me/lm_reader")),
+                parent=self
+            )
+            dlg.exec()
+
     # -----------------------------------------------------------------------
     # NAVIGATION & FULLSCREEN
     # -----------------------------------------------------------------------
@@ -3126,7 +4852,18 @@ class ManhwaApp(QMainWindow):
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
+        prev_idx = self.stack.currentIndex()
         self.stack.setCurrentIndex(index)
+        if prev_idx == 1 and index != 1:
+            if hasattr(self, "canvas"):
+                self.canvas.clear_canvas()
+            if self.current_cloud_worker and self.current_cloud_worker.isRunning():
+                try:
+                    self.current_cloud_worker.cancel()
+                    self.current_cloud_worker.quit()
+                except Exception:
+                    pass
+
         if index == 0:
             self.refresh_catalog()
         elif index == 2:
@@ -3147,20 +4884,27 @@ class ManhwaApp(QMainWindow):
         if event.key() == Qt.Key.Key_F11:
             self.toggle_fullscreen()
         elif event.key() == Qt.Key.Key_H:
-            if self.stack.currentIndex() == 1:
+            if self.stack.currentIndex() == 1 or (hasattr(self, "novel_reader_widget") and self.stack.currentWidget() == self.novel_reader_widget):
                 self.toggle_zen_mode()
         elif event.key() == Qt.Key.Key_Escape:
             if self.is_zen_mode:
                 self.toggle_zen_mode()
             elif self.isFullScreen():
                 self.toggle_fullscreen()
-            elif self.stack.currentIndex() == 1:
+            elif self.stack.currentIndex() == 1 or (hasattr(self, "novel_reader_widget") and self.stack.currentWidget() == self.novel_reader_widget):
                 self.switch_tab(0)
         else:
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
         save_config(self.cfg)
+        if hasattr(self, "canvas"):
+            self.canvas.clear_canvas()
+        if hasattr(self, "stream_client"):
+            try:
+                self.stream_client.disconnect()
+            except Exception:
+                pass
         super().closeEvent(event)
 
 

@@ -1,0 +1,83 @@
+{
+  "vault_channel_id": -1004386061072,
+  "vault_channel_title": "Manhwa Vault",
+  "pinned_catalog_msg_id": 6,
+  "last_updated": "2026-10-10 07:07:28",
+  "titles": {
+    "RI-BH": {
+      "title_code": "RI-BH",
+      "title_name": "Revenge of the Iron-Blooded Hound",
+      "lang": "EN",
+      "total_chapters": 3,
+      "aliases": [
+        "Помста залізно-кровного хорта",
+        "Revenge of the Iron-Blooded Sword Hound",
+        "Iron-Blooded Hound",
+        "Месть железнокровного пса",
+        "Чорний хорт"
+      ],
+      "linked_translations": [
+        {
+          "lang": "UA",
+          "title": "Помста залізно-кровного хорта",
+          "type": "local",
+          "target": "Revenge of the Iron-Blooded Sword Hound"
+        },
+        {
+          "lang": "EN",
+          "title": "Revenge of the Iron-Blooded Hound",
+          "type": "cloud",
+          "target": "RI-BH"
+        }
+      ],
+      "chapters": {
+        "1": {
+          "chapter_num": 1,
+          "filename": "[RI-BH] 001 (Revenge of the Iron-Blooded Hound) [EN].pdf",
+          "size_mb": 9.0,
+          "vault_msg_id": 3,
+          "vault_msg_link": "https://t.me/c/4386061072/3",
+          "source_msg_id": 3,
+          "source_channel": "manhwa047",
+          "tags": [
+            "#TITLE_RI-BH",
+            "#CH_001",
+            "#EN"
+          ],
+          "relayed_at": "2026-10-10 07:03:57"
+        },
+        "2": {
+          "chapter_num": 2,
+          "filename": "[RI-BH] 002 (Revenge of the Iron-Blooded Hound) [EN].pdf",
+          "size_mb": 8.98,
+          "vault_msg_id": 4,
+          "vault_msg_link": "https://t.me/c/4386061072/4",
+          "source_msg_id": 4,
+          "source_channel": "manhwa047",
+          "tags": [
+            "#TITLE_RI-BH",
+            "#CH_002",
+            "#EN"
+          ],
+          "relayed_at": "2026-10-10 07:05:41"
+        },
+        "3": {
+          "chapter_num": 3,
+          "filename": "[RI-BH] 003 (Revenge of the Iron-Blooded Hound) [EN].pdf",
+          "size_mb": 8.91,
+          "vault_msg_id": 5,
+          "vault_msg_link": "https://t.me/c/4386061072/5",
+          "source_msg_id": 5,
+          "source_channel": "manhwa047",
+          "tags": [
+            "#TITLE_RI-BH",
+            "#CH_003",
+            "#EN"
+          ],
+          "relayed_at": "2026-10-10 07:07:23"
+        }
+      }
+    }
+  },
+  "vault_channel": "https://t.me/+O6mlGVWzTSQ5MjVi"
+}

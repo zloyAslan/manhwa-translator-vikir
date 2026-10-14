@@ -23,15 +23,19 @@ def run_suite():
     multiprocessing.freeze_support()
 
     # Initialize Qt Application
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
     # 1. Initialize M_Translate overlay translator components
-    # We instantiate the translator logic sharing the same event loop
-    translator = ManhwaTranslatorApp()
+    # We instantiate the translator logic sharing the same event loop,
+    # but with show_mascot=False so reader opens cleanly, and in_suite=True
+    # so closing the translator does not quit the reader!
+    translator = ManhwaTranslatorApp(show_mascot=False, in_suite=True)
 
     # 2. Initialize and display Manhwa Reader main window
     reader_win = ManhwaApp()
+    # Attach translator instance to reader_win so the "Translate" button activates it
+    reader_win.suite_translator = translator
     reader_win.show()
 
     # Run the unified event loop

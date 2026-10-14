@@ -45,7 +45,8 @@ class HotkeySignal(QObject):
 
 
 class ManhwaTranslatorApp:
-    def __init__(self):
+    def __init__(self, show_mascot: bool = True, in_suite: bool = False):
+        self.in_suite = in_suite
         self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
 
@@ -76,6 +77,7 @@ class ManhwaTranslatorApp:
         self.mascot.ocr_sentence_signal.connect(lambda: self.start_ocr("sentence"))
 
         # Connect bubble window signals
+        self.bubble_window.quit_requested.connect(self.quit_app)
         self.bubble_window.ocr_word_requested.connect(lambda: self.start_ocr("word"))
         self.bubble_window.open_anki_dialog_signal.connect(self.open_anki_dialog)
         self.bubble_window.open_ai_chat_signal.connect(self.on_open_ai_chat)
@@ -106,7 +108,8 @@ class ManhwaTranslatorApp:
         self.hotkey_emitter.blank_anki_triggered.connect(self.on_open_blank_anki)
         self.setup_hotkeys()
 
-        self.mascot.show()
+        if show_mascot:
+            self.mascot.show()
 
     def setup_tray(self):
         self.tray = QSystemTrayIcon(self.app_icon, self.app)
@@ -351,7 +354,17 @@ class ManhwaTranslatorApp:
             keyboard.unhook_all()
         except Exception:
             pass
-        self.app.quit()
+
+        if getattr(self, "in_suite", False):
+            # If running inside suite, closing translator should NOT close the reader!
+            self.mascot.hide()
+            self.bubble_window.hide()
+            self.history_window.hide()
+            self.anki_dialog.hide()
+            self.ai_window.hide()
+            self.tray.hide()
+        else:
+            self.app.quit()
 
     def run(self):
         return self.app.exec()

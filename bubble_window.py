@@ -594,6 +594,7 @@ class LookupThread(QThread):
 
 class BubbleWindow(QWidget):
     closed_signal = pyqtSignal()
+    quit_requested = pyqtSignal()
     ocr_word_requested = pyqtSignal()
     open_anki_dialog_signal = pyqtSignal(str, str, str)
     open_ai_chat_signal = pyqtSignal(str)
@@ -617,7 +618,8 @@ class BubbleWindow(QWidget):
 
         saved_w = self.config.get("window_width", 500)
         saved_h = self.config.get("window_height", 580)
-        self.resize(max(380, saved_w), max(350, saved_h))
+        self.setMinimumSize(420, 380)
+        self.resize(max(440, saved_w), max(400, saved_h))
 
         self.init_ui()
 
@@ -766,7 +768,7 @@ class BubbleWindow(QWidget):
                 color: #FFFFFF;
             }
         """)
-        self.exit_btn.clicked.connect(QApplication.quit)
+        self.exit_btn.clicked.connect(self.quit_requested.emit)
         top_bar.addWidget(self.exit_btn)
 
         # Close / Minimize '✕' button
@@ -1303,6 +1305,9 @@ class BubbleWindow(QWidget):
             pass
 
     def show_and_focus(self, initial_text: str = ""):
+        saved_w = self.config.get("window_width", 500)
+        saved_h = self.config.get("window_height", 580)
+        self.resize(max(440, saved_w), max(400, saved_h))
         self.show()
         self.raise_()
         self.activateWindow()
@@ -1323,8 +1328,9 @@ class BubbleWindow(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.config.set("window_width", self.width())
-        self.config.set("window_height", self.height())
+        if self.width() >= 420 and self.height() >= 380:
+            self.config.set("window_width", self.width())
+            self.config.set("window_height", self.height())
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:

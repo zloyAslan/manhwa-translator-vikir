@@ -13,3 +13,7 @@ manhwa_reader/*.session
 manhwa_reader/.temp_downloads/
 *.zip
 *.exe
+config.json
+*.session
+*.session-journal
+*.db

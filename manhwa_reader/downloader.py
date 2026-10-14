@@ -157,12 +157,28 @@ class TelegramManhwaDownloader:
             return
         
         cfg = load_config()
-        b_tok = self.bot_token or cfg.get("tg_bot_token")
+        # Check if already authorized relay or bot session exists
+        relay_session = Path(__file__).parent / "tg_cloud_relay_session.session"
+        bot_session = Path(__file__).parent / "tg_bot_session.session"
+
+        if relay_session.exists():
+            self.client = TelegramClient(str(Path(__file__).parent / "tg_cloud_relay_session"), self.api_id, self.api_hash)
+            await self.client.connect()
+            if await self.client.is_user_authorized():
+                return
+
+        if bot_session.exists():
+            self.client = TelegramClient(str(Path(__file__).parent / "tg_bot_session"), self.api_id, self.api_hash)
+            await self.client.connect()
+            if await self.client.is_user_authorized():
+                return
 
         if b_tok:
-            from telethon.sessions import MemorySession
-            self.client = TelegramClient(MemorySession(), self.api_id, self.api_hash)
-            await self.client.start(bot_token=b_tok)
+            bot_session_path = str(Path(__file__).parent / "tg_bot_session")
+            self.client = TelegramClient(bot_session_path, self.api_id, self.api_hash)
+            await self.client.connect()
+            if not await self.client.is_user_authorized():
+                await self.client.start(bot_token=b_tok)
             return
 
         self.client = TelegramClient(self.session_path, self.api_id, self.api_hash)
@@ -225,7 +241,7 @@ class TelegramManhwaDownloader:
                                 doc_name = attr.file_name
                                 break
                         ext = Path(doc_name).suffix.lower()
-                        if ext in [".pdf", ".zip", ".cbz", ".cbr", ".rar"]:
+                        if ext in [".pdf", ".zip", ".cbz", ".cbr", ".rar", ".epub", ".docx", ".txt"]:
                             is_valid_doc = True
 
                     caption = message.text or ""
@@ -235,11 +251,14 @@ class TelegramManhwaDownloader:
 
                     if is_valid_doc:
                         ch_num = extract_chapter_number(doc_name) or extract_chapter_number(caption)
+                        msg_date = getattr(message, "date", None)
                         found_items.append({
                             "id": message.id,
                             "message": message,
                             "filename": doc_name,
                             "caption": caption[:100],
+                            "date": msg_date,
+                            "date_str": str(msg_date)[:10] if msg_date else "",
                             "size_mb": round((message.media.document.size or 0) / (1024 * 1024), 2),
                             "chapter": ch_num if ch_num is not None else -1,
                             "type": "doc"
@@ -256,7 +275,7 @@ class TelegramManhwaDownloader:
                             doc_name = attr.file_name
                             break
                     ext = Path(doc_name).suffix.lower()
-                    if ext in [".pdf", ".zip", ".cbz", ".cbr", ".rar"]:
+                    if ext in [".pdf", ".zip", ".cbz", ".cbr", ".rar", ".epub", ".docx", ".txt"]:
                         is_valid_doc = True
 
                 caption = message.text or ""
@@ -266,11 +285,14 @@ class TelegramManhwaDownloader:
 
                 if is_valid_doc:
                     ch_num = extract_chapter_number(doc_name) or extract_chapter_number(caption)
+                    msg_date = getattr(message, "date", None)
                     found_items.append({
                         "id": message.id,
                         "message": message,
                         "filename": doc_name,
                         "caption": caption[:100],
+                        "date": msg_date,
+                        "date_str": str(msg_date)[:10] if msg_date else "",
                         "size_mb": round((message.media.document.size or 0) / (1024 * 1024), 2),
                         "chapter": ch_num if ch_num is not None else -1,
                         "type": "doc"
