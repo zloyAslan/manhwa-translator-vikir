@@ -105,11 +105,51 @@ else:
     BASE_DIR = Path(__file__).parent.resolve()
 
 CONFIG_FILE = BASE_DIR / "config.json"
-DEFAULT_LIB_DIR = BASE_DIR / "library"
-DEFAULT_BOT_TOKEN = "8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA"
+# Safe internal credentials loader (Priority: Environment -> SECRETS_VAULT.local.py -> Built-in Internal Fallback)
+def _load_internal_credentials():
+    api_id = 37560778
+    api_hash = "307da2f94fc6450afe139c91bcc59eaa"
+    bot_token = "8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA"
+    vault_invite = "https://t.me/+O6mlGVWzTSQ5MjVi"
+    vault_channel_id = -1004386061072
+    vault_channel_title = "Manhwa Vault"
 
+    # 1. Environment variables override
+    if os.environ.get("TG_API_ID"):
+        try:
+            api_id = int(os.environ.get("TG_API_ID"))
+        except Exception:
+            pass
+    if os.environ.get("TG_API_HASH"):
+        api_hash = os.environ.get("TG_API_HASH").strip()
+    if os.environ.get("TG_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN"):
+        bot_token = (os.environ.get("TG_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")).strip()
 
-# ---------------------------------------------------------------------------
+    # 2. Local secrets vault if available
+    try:
+        import importlib.util
+        vault_path = BASE_DIR.parent / "SECRETS_VAULT.local.py"
+        if not vault_path.exists():
+            vault_path = BASE_DIR / "SECRETS_VAULT.local.py"
+        if vault_path.exists():
+            spec = importlib.util.spec_from_file_location("secrets_vault", str(vault_path))
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                api_id = getattr(mod, "TELEGRAM_API_ID", api_id)
+                api_hash = getattr(mod, "TELEGRAM_API_HASH", api_hash)
+                bot_token = getattr(mod, "TELEGRAM_BOT_TOKEN", bot_token)
+                vault_invite = getattr(mod, "TELEGRAM_VAULT_INVITE", vault_invite)
+                vault_channel_id = getattr(mod, "TELEGRAM_VAULT_CHANNEL_ID", vault_channel_id)
+                vault_channel_title = getattr(mod, "TELEGRAM_VAULT_CHANNEL_TITLE", vault_channel_title)
+    except Exception:
+        pass
+
+    return api_id, api_hash, bot_token, vault_invite, vault_channel_id, vault_channel_title
+
+INTERNAL_TG_API_ID, INTERNAL_TG_API_HASH, INTERNAL_TG_BOT_TOKEN, INTERNAL_VAULT_INVITE, INTERNAL_VAULT_CHANNEL_ID, INTERNAL_VAULT_CHANNEL_TITLE = _load_internal_credentials()
+DEFAULT_BOT_TOKEN = INTERNAL_TG_BOT_TOKEN
+
 # Multilingual Translations
 # ---------------------------------------------------------------------------
 TRANSLATIONS = {
@@ -162,8 +202,10 @@ TRANSLATIONS = {
         "lang_lbl": "Interface Language:",
         "speed_lbl": "Keyboard Scroll Speed:",
         "lib_lbl": "Library Folder:",
+        "sounds_lbl": "Sounds & Foley Folder:",
         "browse_btn": "Browse...",
         "select_lib_folder": "Select Library Folder",
+        "select_sounds_folder": "Select Sounds & Audio Packs Folder",
         "save_btn": "💾 Save Settings",
         "saved_msg": "Settings saved successfully!",
         "auth_btn": "🤖 Bot Token",
@@ -353,8 +395,10 @@ TRANSLATIONS = {
         "lang_lbl": "Мова інтерфейсу:",
         "speed_lbl": "Швидкість скролу клавішами:",
         "lib_lbl": "Папка бібліотеки:",
+        "sounds_lbl": "Папка аудіо та фолей (звуків):",
         "browse_btn": "Огляд...",
         "select_lib_folder": "Виберіть папку бібліотеки",
+        "select_sounds_folder": "Виберіть папку для аудіо та звукових паків",
         "save_btn": "💾 Зберегти налаштування",
         "saved_msg": "Налаштування успішно збережено!",
         "auth_btn": "🤖 Токен Бота",
@@ -544,8 +588,10 @@ TRANSLATIONS = {
         "lang_lbl": "Язык интерфейса:",
         "speed_lbl": "Скорость скролла клавишами:",
         "lib_lbl": "Папка библиотеки:",
+        "sounds_lbl": "Папка аудио и фолей (звуков):",
         "browse_btn": "Обзор...",
         "select_lib_folder": "Выберите папку библиотеки",
+        "select_sounds_folder": "Выберите папку для аудио и звуковых паков",
         "save_btn": "💾 Сохранить настройки",
         "saved_msg": "Настройки успешно сохранены!",
         "auth_btn": "🤖 Токен Бота",
@@ -693,6 +739,7 @@ TRANSLATIONS = {
 def load_config() -> dict:
     default_cfg = {
         "library_path": "library",
+        "sounds_path": "sounds",
         "reading_width": 880,
         "bg_color": "#0f1115",
         "zoom": 1.0,
@@ -704,9 +751,6 @@ def load_config() -> dict:
         "auto_preload_threshold": 0.67,
         "language": "en",
         "delete_pdf_after_extract": True,
-        "tg_api_id": 37560778,
-        "tg_api_hash": "307da2f94fc6450afe139c91bcc59eaa",
-        "tg_bot_token": DEFAULT_BOT_TOKEN,
         "bookmarks": {}
     }
     if CONFIG_FILE.exists():
@@ -716,15 +760,35 @@ def load_config() -> dict:
                 default_cfg.update(data)
         except Exception:
             pass
-    if not default_cfg.get("tg_bot_token"):
-        default_cfg["tg_bot_token"] = DEFAULT_BOT_TOKEN
+
+    # Ensure in-memory presence of telegram and vault credentials
+    default_cfg["tg_api_id"] = default_cfg.get("tg_api_id") or INTERNAL_TG_API_ID
+    default_cfg["tg_api_hash"] = default_cfg.get("tg_api_hash") or INTERNAL_TG_API_HASH
+    default_cfg["tg_bot_token"] = default_cfg.get("tg_bot_token") or INTERNAL_TG_BOT_TOKEN
+    default_cfg["tg_vault_invite"] = default_cfg.get("tg_vault_invite") or INTERNAL_VAULT_INVITE
+    default_cfg["tg_vault_channel_id"] = default_cfg.get("tg_vault_channel_id") or INTERNAL_VAULT_CHANNEL_ID
+    default_cfg["tg_vault_channel_title"] = default_cfg.get("tg_vault_channel_title") or INTERNAL_VAULT_CHANNEL_TITLE
+
     return default_cfg
 
 
 def save_config(cfg: dict):
+    """
+    Saves user configuration to config.json.
+    Excludes sensitive Telegram credentials and private vault channel IDs
+    so they remain compiled internally and never leaked into plain text files.
+    """
     try:
+        clean_cfg = dict(cfg)
+        # Strip internal secrets from plain disk file
+        for secret_key in [
+            "tg_api_id", "tg_api_hash", "tg_bot_token",
+            "tg_vault_invite", "tg_vault_channel_id", "tg_vault_channel_title"
+        ]:
+            clean_cfg.pop(secret_key, None)
+
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
+            json.dump(clean_cfg, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"Error saving config: {e}")
 
@@ -2646,7 +2710,7 @@ class WebtoonScrollCanvas(QScrollArea):
         self.cfg = cfg
         self.reading_width = cfg.get("reading_width", 880)
         self.zoom = cfg.get("zoom", 1.0)
-        self.bg_color = cfg.get("bg_color", "#0f1115")
+        self.bg_color = cfg.get("bg_color", "transparent")
 
         self.current_manhwa_name = ""
         self.current_manhwa_path: Optional[Path] = None
@@ -2654,7 +2718,10 @@ class WebtoonScrollCanvas(QScrollArea):
         self.chapter_modes: Dict[int, str] = {}
         self.active_mode = "jpeg"
         self.page_labels: List[Tuple[int, QLabel, str]] = []
-        self.pixmap_cache: Dict[str, QPixmap] = {}
+        # Bounded LRU Pixmap cache (max 120 full-size page pixmaps in RAM)
+        from collections import OrderedDict
+        self.pixmap_cache: OrderedDict[str, QPixmap] = OrderedDict()
+        self.max_pixmap_items = 120
 
         # Preloaded Audio Timelines cache (ch_num -> timeline cues)
         self.preloaded_timelines: Dict[int, list] = {}
@@ -2679,16 +2746,13 @@ class WebtoonScrollCanvas(QScrollArea):
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setStyleSheet(f"QScrollArea {{ background-color: {self.bg_color}; border: none; }}")
 
         self.container = QWidget()
-        self.container.setStyleSheet(f"background-color: {self.bg_color};")
         self.main_layout = QHBoxLayout(self.container)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
         self.strip_widget = QWidget()
-        self.strip_widget.setStyleSheet(f"background-color: {self.bg_color};")
         self.strip_layout = QVBoxLayout(self.strip_widget)
         self.strip_layout.setContentsMargins(0, 0, 0, 0)
         self.strip_layout.setSpacing(0)
@@ -2749,7 +2813,23 @@ class WebtoonScrollCanvas(QScrollArea):
         self.main_layout.addStretch(1)
 
         self.setWidget(self.container)
+        self.set_bg_color(self.bg_color)
         self.verticalScrollBar().valueChanged.connect(self.on_scroll)
+
+    def _cache_pixmap(self, key: str, pm: QPixmap):
+        """Puts pixmap into bounded LRU cache, evicting oldest if capacity exceeded."""
+        if key in self.pixmap_cache:
+            self.pixmap_cache.move_to_end(key)
+        self.pixmap_cache[key] = pm
+        while len(self.pixmap_cache) > self.max_pixmap_items:
+            self.pixmap_cache.popitem(last=False)
+
+    def _get_pixmap(self, key: str) -> Optional[QPixmap]:
+        """Gets pixmap from LRU cache, refreshing its recency."""
+        if key in self.pixmap_cache:
+            self.pixmap_cache.move_to_end(key)
+            return self.pixmap_cache[key]
+        return None
 
     def show_cloud_progress(self, ch_num: int, pct: float, cur_bytes: int, total_bytes: int):
         self.strip_widget.hide()
@@ -2781,16 +2861,21 @@ class WebtoonScrollCanvas(QScrollArea):
         self.zoom = max(0.5, min(2.5, zoom))
         self.scale_timer.start()
 
+    def paintEvent(self, event):
+        if self.bg_color != "transparent":
+            painter = QPainter(self.viewport())
+            painter.fillRect(self.viewport().rect(), QColor(self.bg_color))
+            painter.end()
+        super().paintEvent(event)
+
     def set_bg_color(self, hex_color: str):
         self.bg_color = hex_color
-        if hex_color == "transparent":
-            self.setStyleSheet("QScrollArea { background-color: transparent; background: transparent; border: none; }")
-            self.container.setStyleSheet("background-color: transparent; background: transparent;")
-            self.strip_widget.setStyleSheet("background-color: transparent; background: transparent;")
-        else:
-            self.setStyleSheet(f"QScrollArea {{ background-color: {self.bg_color}; border: none; }}")
-            self.container.setStyleSheet(f"background-color: {self.bg_color};")
-            self.strip_widget.setStyleSheet(f"background-color: {self.bg_color};")
+        # Always maintain transparent widget baseline so Qt does not lock alpha channel
+        self.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; border: none; }")
+        self.viewport().setStyleSheet("background: transparent;")
+        self.container.setStyleSheet("background: transparent;")
+        self.strip_widget.setStyleSheet("background: transparent;")
+        self.viewport().update()
 
     def get_chapter_resources(self, ch_num: int) -> Tuple[List[Path], Optional[Path]]:
         if not self.current_manhwa_path:
@@ -2982,7 +3067,7 @@ class WebtoonScrollCanvas(QScrollArea):
 
         rendered_pages = self.rolling_cache.render_pdf_stream(start_ch_num, pdf_bytes, target_w=target_w)
         for idx, (pm, cache_key) in enumerate(rendered_pages):
-            self.pixmap_cache[cache_key] = pm
+            self._cache_pixmap(cache_key, pm)
             lbl = QLabel()
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setContentsMargins(0, 0, 0, 0)
@@ -3015,7 +3100,7 @@ class WebtoonScrollCanvas(QScrollArea):
 
         pages = self.rolling_cache.rendered_pages.get(next_ch, [])
         for idx, (pm, cache_key) in enumerate(pages):
-            self.pixmap_cache[cache_key] = pm
+            self._cache_pixmap(cache_key, pm)
             lbl = QLabel()
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setContentsMargins(0, 0, 0, 0)
@@ -3069,10 +3154,11 @@ class WebtoonScrollCanvas(QScrollArea):
                 lbl.setStyleSheet("border: none; padding: 0px; margin: 0px;")
 
                 sp = str(img_p)
-                if sp not in self.pixmap_cache:
-                    self.pixmap_cache[sp] = QPixmap(sp)
+                pm = self._get_pixmap(sp)
+                if pm is None:
+                    pm = QPixmap(sp)
+                    self._cache_pixmap(sp, pm)
 
-                pm = self.pixmap_cache[sp]
                 if not pm.isNull():
                     lbl.setPixmap(pm.scaledToWidth(target_w, Qt.TransformationMode.SmoothTransformation))
 
@@ -3095,7 +3181,7 @@ class WebtoonScrollCanvas(QScrollArea):
                     pm = QPixmap.fromImage(qimg.copy())
 
                     cache_key = f"pdf_{pdf_path.name}_{ch_num}_{idx}"
-                    self.pixmap_cache[cache_key] = pm
+                    self._cache_pixmap(cache_key, pm)
 
                     lbl = QLabel()
                     lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -3121,9 +3207,10 @@ class WebtoonScrollCanvas(QScrollArea):
 
         self.strip_widget.setUpdatesEnabled(False)
         for ch_num, lbl, cache_key in self.page_labels:
-            if cache_key not in self.pixmap_cache:
-                self.pixmap_cache[cache_key] = QPixmap(cache_key)
-            pm = self.pixmap_cache[cache_key]
+            pm = self._get_pixmap(cache_key)
+            if pm is None:
+                pm = QPixmap(cache_key)
+                self._cache_pixmap(cache_key, pm)
             if not pm.isNull():
                 lbl.setPixmap(pm.scaledToWidth(target_w, Qt.TransformationMode.SmoothTransformation))
         self.strip_widget.setUpdatesEnabled(True)
@@ -3303,11 +3390,12 @@ class ManhwaApp(QMainWindow):
 
         raw_lib = self.cfg.get("library_path", "library")
         candidate = Path(raw_lib)
-        if candidate.is_absolute() and candidate.exists():
+        if candidate.is_absolute():
             self.lib_dir = candidate
         else:
-            self.lib_dir = (BASE_DIR / candidate.name if candidate.name else BASE_DIR / "library").resolve()
+            self.lib_dir = (BASE_DIR / candidate).resolve()
         self.lib_dir.mkdir(parents=True, exist_ok=True)
+
 
         self.current_reading_manhwa = ""
         self.current_reading_chapter = 1
@@ -3320,11 +3408,20 @@ class ManhwaApp(QMainWindow):
         self.stream_client = TelegramStreamClient()
         self.current_cloud_worker: Optional[StreamDownloadThread] = None
 
+        # Sounds directory resolution (relative to BASE_DIR or custom absolute path)
+        raw_sounds = self.cfg.get("sounds_path", "sounds")
+        candidate_sounds = Path(raw_sounds)
+        if candidate_sounds.is_absolute():
+            self.sounds_dir = candidate_sounds
+        else:
+            self.sounds_dir = (BASE_DIR / candidate_sounds).resolve()
+        self.sounds_dir.mkdir(parents=True, exist_ok=True)
+
         # Sound Engine & AI Atmosphere Analyzer
         gemini_key = self.cfg.get("gemini_api_key", "")
-        self.ai_analyzer = AISoundAnalyzer(api_key=gemini_key) if AISoundAnalyzer is not None else None
+        self.ai_analyzer = AISoundAnalyzer(api_key=gemini_key, sounds_dir=self.sounds_dir) if AISoundAnalyzer is not None else None
         if SoundEngine is not None:
-            self.sound_engine = SoundEngine(self)
+            self.sound_engine = SoundEngine(self, sounds_dir=self.sounds_dir)
             self.sound_engine.set_enabled(self.cfg.get("music_enabled", False))
             self.sound_engine.set_volume(self.cfg.get("music_volume", 40))
         else:
@@ -4973,6 +5070,40 @@ class ManhwaApp(QMainWindow):
         lib_box.addWidget(self.lib_browse_btn)
         grid.addLayout(lib_box, 5, 1)
 
+        # Sounds & Foley Folder row
+        self.settings_sounds_lbl = QLabel(self.t.get("sounds_lbl", "Папка аудіо та фолей (звуків):"))
+        grid.addWidget(self.settings_sounds_lbl, 6, 0)
+
+        sounds_box = QHBoxLayout()
+        sounds_box.setSpacing(8)
+        self.sounds_inp = QLineEdit(str(self.sounds_dir))
+        self.sounds_inp.setReadOnly(False)
+        self.sounds_inp.setPlaceholderText("Введіть або вставте шлях до папки звуків (наприклад: D:\\my_sounds)...")
+        self.sounds_inp.setStyleSheet("background: #1e2030; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 8px 12px; font-size: 13px;")
+        self.sounds_inp.editingFinished.connect(self._on_sounds_inp_editing_finished)
+        sounds_box.addWidget(self.sounds_inp, stretch=1)
+        self.sounds_browse_btn = QPushButton(f"📁 {self.t.get('browse_btn', 'Огляд...')}")
+        self.sounds_browse_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.sounds_browse_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                color: #F3F4F6;
+                font-weight: 700;
+                font-size: 13px;
+                border-radius: 8px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.16);
+                border-color: #A78BFA;
+                color: #FFFFFF;
+            }
+        """)
+        self.sounds_browse_btn.clicked.connect(self._browse_sounds_folder)
+        sounds_box.addWidget(self.sounds_browse_btn)
+        grid.addLayout(sounds_box, 6, 1)
+
         card_layout.addLayout(grid)
 
         self.save_btn = QPushButton(self.t["save_btn"])
@@ -5335,6 +5466,49 @@ class ManhwaApp(QMainWindow):
             except Exception as e:
                 logger.error(f"Error updating library path from text: {e}")
 
+    def _browse_sounds_folder(self):
+        try:
+            start_dir = str(self.sounds_dir.resolve()) if self.sounds_dir.exists() else ""
+            caption = self.t.get("select_sounds_folder", "Виберіть папку для аудіо та звукових паків")
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                caption,
+                start_dir,
+                QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontUseNativeDialog
+            )
+            if folder:
+                p = Path(folder).resolve()
+                self.sounds_inp.setText(str(p))
+                self._apply_new_sounds_dir(p)
+        except Exception as e:
+            logger.error(f"Error picking sounds directory: {e}")
+
+    def _on_sounds_inp_editing_finished(self):
+        txt = self.sounds_inp.text().strip()
+        if txt:
+            try:
+                p = Path(txt).resolve()
+                if p != self.sounds_dir:
+                    self._apply_new_sounds_dir(p)
+            except Exception as e:
+                logger.error(f"Error updating sounds path from text: {e}")
+
+    def _apply_new_sounds_dir(self, p: Path):
+        p.mkdir(parents=True, exist_ok=True)
+        default_sounds = (BASE_DIR / "sounds").resolve()
+        if p == default_sounds:
+            self.cfg["sounds_path"] = "sounds"
+        else:
+            self.cfg["sounds_path"] = str(p)
+        self.sounds_dir = p
+        if hasattr(self, "sound_engine") and self.sound_engine:
+            self.sound_engine.set_sounds_dir(p)
+        if hasattr(self, "ai_analyzer") and self.ai_analyzer:
+            self.ai_analyzer.set_sounds_dir(p)
+        if hasattr(self, "_populate_music_presets"):
+            self._populate_music_presets()
+        save_config(self.cfg)
+
     def _toggle_gemini_key_visibility(self):
         if not hasattr(self, "gemini_key_inp"):
             return
@@ -5374,7 +5548,7 @@ class ManhwaApp(QMainWindow):
         try:
             if SoundStudioWindow is None:
                 return
-            sounds_dir = BASE_DIR / "sounds"
+            sounds_dir = getattr(self, "sounds_dir", BASE_DIR / "sounds")
             dlg = SoundStudioWindow(sounds_dir, self)
             dlg.exec()
             if hasattr(self, "sound_engine") and self.sound_engine:
@@ -5441,7 +5615,8 @@ class ManhwaApp(QMainWindow):
         self.music_preset_combo.addItem(ai_title, "ai_adaptive")
 
         # 2. My sounds
-        my_sounds_path = BASE_DIR / "sounds" / "my_sounds"
+        sounds_root = getattr(self, "sounds_dir", BASE_DIR / "sounds")
+        my_sounds_path = sounds_root / "my_sounds"
         my_tpl = self.t.get("music_preset_my_sounds", "⭐ [Мої треки] {name}")
         if my_sounds_path.exists():
             for f in sorted(list(my_sounds_path.glob("*.*"))):
@@ -5449,7 +5624,7 @@ class ManhwaApp(QMainWindow):
                     self.music_preset_combo.addItem(my_tpl.format(name=f.stem), f"my_sounds:{f.stem}")
 
         # 3. UI soundtrack tracks
-        ui_path = BASE_DIR / "sounds" / "ui"
+        ui_path = sounds_root / "ui"
         ui_tpl = self.t.get("music_preset_ui", "🎶 [Саундтрек] {name}")
         if ui_path.exists():
             for f in sorted(list(ui_path.glob("*.*"))):
@@ -5571,6 +5746,15 @@ class ManhwaApp(QMainWindow):
                         self.populate_unpack_manhwas()
                 except Exception as e:
                     logger.error(f"Failed to update library folder: {e}")
+
+        # Update sounds path if changed
+        if hasattr(self, "sounds_inp") and self.sounds_inp.text().strip():
+            new_sp = Path(self.sounds_inp.text().strip()).resolve()
+            if new_sp != self.sounds_dir:
+                try:
+                    self._apply_new_sounds_dir(new_sp)
+                except Exception as e:
+                    logger.error(f"Failed to update sounds folder: {e}")
 
         save_config(self.cfg)
 
@@ -5744,6 +5928,10 @@ class ManhwaApp(QMainWindow):
             self.settings_lib_lbl.setText(self.t["lib_lbl"])
         if hasattr(self, "lib_browse_btn"):
             self.lib_browse_btn.setText(f"📁 {self.t.get('browse_btn', 'Огляд...')}")
+        if hasattr(self, "settings_sounds_lbl"):
+            self.settings_sounds_lbl.setText(self.t.get("sounds_lbl", "Папка аудіо та фолей (звуків):"))
+        if hasattr(self, "sounds_browse_btn"):
+            self.sounds_browse_btn.setText(f"📁 {self.t.get('browse_btn', 'Огляд...')}")
         if hasattr(self, "save_btn"):
             self.save_btn.setText(self.t["save_btn"])
         if hasattr(self, "uc_title"):
@@ -5966,6 +6154,19 @@ class ManhwaApp(QMainWindow):
 
     def closeEvent(self, event):
         save_config(self.cfg)
+        if hasattr(self, "worker") and self.worker and self.worker.isRunning():
+            try:
+                self.worker.terminate()
+                self.worker.wait(200)
+            except Exception:
+                pass
+        if hasattr(self, "cloud_dl_worker") and self.cloud_dl_worker and self.cloud_dl_worker.isRunning():
+            try:
+                self.cloud_dl_worker.cancel()
+                self.cloud_dl_worker.terminate()
+                self.cloud_dl_worker.wait(200)
+            except Exception:
+                pass
         if hasattr(self, "canvas"):
             self.canvas.clear_canvas()
         if hasattr(self, "stream_client"):
@@ -5973,7 +6174,14 @@ class ManhwaApp(QMainWindow):
                 self.stream_client.disconnect()
             except Exception:
                 pass
+        if hasattr(self, "sound_engine") and self.sound_engine:
+            try:
+                self.sound_engine.stop_ambient()
+                self.sound_engine.stop_sfx()
+            except Exception:
+                pass
         super().closeEvent(event)
+
 
 
 # ---------------------------------------------------------------------------

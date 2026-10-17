@@ -17,8 +17,15 @@ from PIL import Image, ImageOps
 import numpy as np
 from rapidocr_onnxruntime import RapidOCR
 
-# Initialize OCR engine once globally
-_ocr_engine = RapidOCR()
+# Lazy OCR engine singleton
+_ocr_engine_instance = None
+
+def get_ocr_engine():
+    global _ocr_engine_instance
+    if _ocr_engine_instance is None:
+        _ocr_engine_instance = RapidOCR()
+    return _ocr_engine_instance
+
 
 
 def normalize_manhwa_caps(text: str) -> str:
@@ -55,7 +62,8 @@ class OcrWorker(QThread):
             # 1. Add white margin padding so text touching the border is not cut off
             padded_img = ImageOps.expand(self.pil_image, border=25, fill='white')
             np_img = np.array(padded_img)
-            result, elapse = _ocr_engine(np_img)
+            engine = get_ocr_engine()
+            result, elapse = engine(np_img)
             
             if result:
                 # 2. Sort detected boxes strictly from top to bottom, left to right

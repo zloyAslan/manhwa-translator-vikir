@@ -53,44 +53,50 @@ def scan_layered_sound_pools(sounds_dir: Path) -> tuple[list[str], list[str], li
     my_dir = sounds_dir / "my_sounds"
     sfx_dir = sounds_dir / "sfx"
 
-    bg_candidates = set([
-        "legendary-kingdom-music-rising-empire", "fantasy-ambient", "magic_fantasy",
-        "ancient_celtic_music", "nto-the-darkness-cello-version-long",
-        "by-the-rafters-glow-full-version-medieval-tavern-music-rpg-game",
-        "desert_in_bloom", "magical-forest-instrumental-flute-strings-melody",
-        "silence"
-    ])
-    amb_candidates = set([
-        "cave", "dungeon", "forest", "rain", "storm", "tavern",
-        "crowd", "fireplace", "military_camp", "snow_mountain", "ocean_beach",
-        "village", "barrack", "turkish_bazar", "birds_voices", "crows", "gull",
-        "movements_in_forest", "war_drums", "silence"
-    ])
-    sfx_candidates = set([
-        "sword_clash", "heavy_strike", "magic_cast", "gallop", "run",
-        "monster_roar", "male_laugh", "meme_laugh", "scream", "heartbeat",
-        "page_turn", "neighing", "crows", "guns_battle", "none"
-    ])
+    bg_candidates = set(["silence"])
+    amb_candidates = set(["silence"])
+    sfx_candidates = set(["none"])
 
-    # Scan installed files dynamically
+    # Scan installed files dynamically from all sound directories
     for directory in [amb_dir, ui_dir, my_dir]:
         if directory.exists():
-            for item in directory.iterdir():
+            for item in directory.rglob("*"):
                 if item.is_file() and item.suffix.lower() in [".mp3", ".ogg", ".wav"]:
                     base = re.sub(r'_\d+$', '', item.stem).strip().lower()
                     if base and not base.startswith("test_sound"):
                         # If file is in ui or has melodic indicators, place in bg
-                        if directory == ui_dir or any(k in base for k in ["music", "empire", "melody", "flute", "theme", "bloom", "celtic", "cello", "glow", "rafter"]):
+                        if directory == ui_dir or any(k in base for k in ["music", "empire", "melody", "flute", "theme", "bloom", "celtic", "cello", "glow", "rafter", "kingdom"]):
                             bg_candidates.add(base)
                         else:
                             amb_candidates.add(base)
 
     if sfx_dir.exists():
-        for item in sfx_dir.iterdir():
+        for item in sfx_dir.rglob("*"):
             if item.is_file() and item.suffix.lower() in [".mp3", ".ogg", ".wav"]:
                 base = re.sub(r'_\d+$', '', item.stem).strip().lower()
                 if base:
                     sfx_candidates.add(base)
+
+    # If folder is empty or not yet populated, provide clean defaults
+    if len(bg_candidates) <= 1:
+        bg_candidates.update([
+            "legendary-kingdom-music-rising-empire", "fantasy-ambient", "magic_fantasy",
+            "ancient_celtic_music", "nto-the-darkness-cello-version-long",
+            "by-the-rafters-glow-full-version-medieval-tavern-music-rpg-game",
+            "desert_in_bloom", "magical-forest-instrumental-flute-strings-melody"
+        ])
+    if len(amb_candidates) <= 1:
+        amb_candidates.update([
+            "cave", "dungeon", "forest", "rain", "storm", "tavern",
+            "crowd", "fireplace", "military_camp", "snow_mountain", "ocean_beach",
+            "village", "barrack", "turkish_bazar", "birds_voices", "crows", "war_drums"
+        ])
+    if len(sfx_candidates) <= 1:
+        sfx_candidates.update([
+            "sword_clash", "heavy_strike", "magic_cast", "gallop", "run",
+            "monster_roar", "male_laugh", "meme_laugh", "scream", "heartbeat",
+            "page_turn", "neighing", "crows", "guns_battle"
+        ])
 
     return sorted(list(bg_candidates)), sorted(list(amb_candidates)), sorted(list(sfx_candidates))
 
@@ -114,6 +120,10 @@ class AISoundAnalyzer:
 
     def set_api_key(self, api_key: str):
         self.api_key = api_key.strip()
+
+    def set_sounds_dir(self, new_dir: Path):
+        """Updates root sound directory for AI mood/sfx pool detection."""
+        self.sounds_dir = Path(new_dir)
 
     def get_or_analyze_chapter(
         self,
@@ -247,20 +257,24 @@ A great soundtrack is a blend of 3 distinct elements playing together in harmony
      * Heavy rain / thunder -> "rain" or "storm" (vol: 0.50-0.65).
      * If entering a soundproof room or when ambiance should stop -> "none" or "silence".
 
-3. LAYER 3: "sfx" (Dynamic Action, Monster Events & Foley Accents):
+3. LAYER 3: "sfx" (Dynamic Action, Monster Events, Multi-SFX Foley & Accents):
    - Immediate actions and visual beats that occur on specific panels or quarter-pages.
-   - "sfx_vol": 0.40 to 0.85 (delicate cues like subtle smirks or whispers at 0.40-0.50, heavy strikes at 0.85).
+   - MULTI-SFX & FOLEY LAYERING:
+     * "sfx" CAN CONTAIN MULTIPLE SIMULTANEOUS SOUNDS SEPARATED BY COMMAS!
+     * For example: "neighing,sword_clash" (horse neighing while sword strikes), "monster_roar,heavy_strike", "war_drums,gallop", or "scream,sword_clash".
+     * When multiple sounds occur simultaneously in a dramatic clash, combine them via commas: e.g. "sfx": "neighing,sword_clash".
+   - "sfx_vol": 0.40 to 0.85 (subtle smirks/whispers at 0.40-0.50, heavy strikes/explosions at 0.85).
    - "sfx_mode":
-     * "one_shot": plays once on impact.
-       Available: "monster_roar", "sword_clash", "heavy_strike", "magic_cast", "male_laugh", "scream", "heartbeat", "guns_battle", "page_turn", "neighing".
+     * "one_shot": impacts or momentary cues that trigger once (even if comma-separated like "neighing,sword_clash").
      * "loop_until_next": sustained continuous actions (e.g. "gallop", "run", "war_drums").
-   - HOW TO SUSTAIN OR CANCEL CONTINUOUS ACTION:
-     * If a horse is galloping through 2-3 fractions: keep "sfx": "gallop" and "sfx_mode": "loop_until_next".
-     * When the rider attacks or dismounts: emit "sword_clash" ("one_shot") or "war_drums", or set "sfx": "none". The gallop will automatically stop!
-     * NEVER let gallop or running keep playing when the horse or action has ended!
+   - HOW TO SUSTAIN, COMBINE, OR CANCEL CONTINUOUS ACTION:
+     * While horse gallops: "sfx": "gallop", "sfx_mode": "loop_until_next".
+     * At moment of impact during the gallop: emit "sfx": "neighing,sword_clash" ("one_shot"). The engine layers the clash and neigh on top, or seamlessly shifts into battle drums.
+     * When action ceases: set "sfx": "none" or "sfx_mode": "one_shot". The loop will cleanly fade out.
 
 SPECIFIC VISUAL & SCENE RULES:
-- MONSTERS & DRAGONS: When monsters, gargoyles, or dragons appear (e.g. red flying monsters, dark beasts in caves) -> use "amb": "cave", "bg": "nto-the-darkness-cello-version-long", and trigger "sfx": "monster_roar" or "heartbeat"!
+- MONSTERS & DRAGONS: When monsters, gargoyles, or dragons appear (e.g. red flying monsters, dark beasts in caves) -> use "amb": "cave", "bg": "nto-the-darkness-cello-version-long", and trigger "sfx": "monster_roar" or "monster_roar,heartbeat"!
+- BATTLEFIELD CLASHES: When mounted knights or warriors charge into battle -> use "sfx": "gallop,war_drums" or "sword_clash,neighing".
 - DREAD & SHOCK: When a character is frozen in fear, terrified, or sensing sudden danger -> trigger "sfx": "heartbeat" (vol: 0.60-0.75).
 - CHARACTER EXPRESSIONS & VILLAIN SMIRKS: When a character has a cunning smirk, dark smile, or smug grin -> trigger "sfx": "male_laugh" (vol: 0.50).
 - NO MODERN SOUNDS: NEVER use "city" or car traffic in a medieval fantasy manhwa!
@@ -287,10 +301,22 @@ Output ONLY a valid JSON array of objects without Markdown formatting or markdow
     "bg_vol": 0.35,
     "amb": "cave",
     "amb_vol": 0.55,
-    "sfx": "monster_roar",
+    "sfx": "monster_roar,heavy_strike",
     "sfx_vol": 0.85,
     "sfx_mode": "one_shot",
-    "d": "flying red dragon monsters screeching"
+    "d": "dragon monster roaring and striking the ground"
+  }},
+  {{
+    "p": 4,
+    "f": 1,
+    "bg": "legendary-kingdom-music-rising-empire",
+    "bg_vol": 0.35,
+    "amb": "military_camp",
+    "amb_vol": 0.50,
+    "sfx": "gallop,neighing",
+    "sfx_vol": 0.80,
+    "sfx_mode": "one_shot",
+    "d": "cavalry charge arrives at the front gate"
   }},
   {{
     "p": 5,

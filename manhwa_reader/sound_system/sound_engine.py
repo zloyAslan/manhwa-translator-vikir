@@ -104,12 +104,23 @@ class SoundEngine(QObject):
         self.amb_fade_in_player = "A"
 
         # -------------------------------------------------------------
-        # LAYER 3: Dynamic SFX & Action Channel
+        # LAYER 3: Dynamic Multi-SFX & Action Channel
         # -------------------------------------------------------------
-        # One-shot player (strikes, spells, roar, laughter)
-        self.sfx_out = QAudioOutput()
-        self.sfx_player = QMediaPlayer()
-        self.sfx_player.setAudioOutput(self.sfx_out)
+        # One-shot multi-voice pool for simultaneous multi-SFX layering
+        self.sfx_pool_size = 6
+        self.sfx_players: List[QMediaPlayer] = []
+        self.sfx_outputs: List[QAudioOutput] = []
+        for _ in range(self.sfx_pool_size):
+            out = QAudioOutput()
+            player = QMediaPlayer()
+            player.setAudioOutput(out)
+            self.sfx_outputs.append(out)
+            self.sfx_players.append(player)
+        self.sfx_player_idx = 0
+
+        # Primary references for backward compatibility
+        self.sfx_out = self.sfx_outputs[0]
+        self.sfx_player = self.sfx_players[0]
 
         # Action loop player (sustained galloping, running, battle noise until next action)
         self.sfx_loop_out = QAudioOutput()
@@ -155,6 +166,20 @@ class SoundEngine(QObject):
                 logger.warning(f"Failed to load sound_recipes.json: {e}")
         return {}
 
+    def set_sounds_dir(self, new_dir: Path):
+        """Dynamically reconfigures the sound directory root and updates subdirectories."""
+        self.sounds_dir = Path(new_dir)
+        self.ambient_dir = self.sounds_dir / "ambient"
+        self.sfx_dir = self.sounds_dir / "sfx"
+        self.ui_dir = self.sounds_dir / "ui"
+        self.my_sounds_dir = self.sounds_dir / "my_sounds"
+        self.ambient_dir.mkdir(parents=True, exist_ok=True)
+        self.sfx_dir.mkdir(parents=True, exist_ok=True)
+        self.ui_dir.mkdir(parents=True, exist_ok=True)
+        self.my_sounds_dir.mkdir(parents=True, exist_ok=True)
+        self.recipes_file = self.sounds_dir / "sound_recipes.json"
+        self.reload_recipes()
+
     def reload_recipes(self):
         self.recipes = self._load_recipes()
 
@@ -182,16 +207,18 @@ class SoundEngine(QObject):
         else:
             self.amb_out_b.setVolume(eff_amb_vol)
 
-        # Layer 3: SFX
+        # Layer 3: SFX Pool
         eff_sfx_vol = self.master_volume * self.sfx_target_vol
-        self.sfx_out.setVolume(eff_sfx_vol)
+        for out in self.sfx_outputs:
+            out.setVolume(eff_sfx_vol)
         self.sfx_loop_out.setVolume(eff_sfx_vol)
 
     def set_chapter_loading(self, loading: bool):
         """Stops/resumes effects during chapter loads to prevent delayed audio."""
         self.is_loading_chapter = loading
         if loading:
-            self.sfx_player.stop()
+            for p in self.sfx_players:
+                p.stop()
             self.sfx_loop_player.stop()
 
     def set_timeline(self, timeline: List[Dict[str, Any]]):
@@ -502,16 +529,32 @@ class SoundEngine(QObject):
         if not self.is_enabled or self.is_loading_chapter or not sfx_name:
             return
 
-        audio_file = self._find_audio_file(self.sfx_dir, sfx_name)
-        if not audio_file:
-            audio_file = self._find_audio_file(self.ambient_dir, sfx_name)
-        if not audio_file:
-            logger.debug(f"[SoundEngine] SFX '{sfx_name}' requested (not found)")
+        # Support multi-SFX combinations: e.g. "horse_whinny,sword_clash" or "monster_roar,heavy_strike"
+        tokens = [t.strip() for t in str(sfx_name).split(",") if t.strip() and t.strip().lower() not in ["none", "silence"]]
+        if not tokens:
             return
 
-        self.sfx_out.setVolume(self.master_volume * volume_scale)
-        self.sfx_player.setSource(QUrl.fromLocalFile(str(audio_file)))
-        self.sfx_player.play()
+        for token in tokens:
+            audio_file = self._find_audio_file(self.sfx_dir, token)
+            if not audio_file:
+                audio_file = self._find_audio_file(self.ambient_dir, token)
+            if not audio_file:
+                audio_file = self._find_audio_file(self.my_sounds_dir, token)
+            if not audio_file:
+                audio_file = self._find_audio_file(self.ui_dir, token)
+
+            if not audio_file:
+                logger.debug(f"[SoundEngine] SFX '{token}' requested (not found)")
+                continue
+
+            # Round-robin allocation across player voice pool so effects layer cleanly without clipping
+            player = self.sfx_players[self.sfx_player_idx]
+            out = self.sfx_outputs[self.sfx_player_idx]
+            self.sfx_player_idx = (self.sfx_player_idx + 1) % len(self.sfx_players)
+
+            out.setVolume(self.master_volume * volume_scale)
+            player.setSource(QUrl.fromLocalFile(str(audio_file)))
+            player.play()
 
     def play_sfx_loop(self, sfx_name: str, volume_scale: float = 0.75):
         if not self.is_enabled or self.is_loading_chapter or not sfx_name:
@@ -594,6 +637,8 @@ class SoundEngine(QObject):
         self._stop_bg(fade=fade)
         self._stop_amb(fade=fade)
         self.stop_sfx_loop(fade=fade)
+        for p in self.sfx_players:
+            p.stop()
         self.last_triggered_key = ""
 
     def _find_audio_file(self, directory: Path, name: str) -> Optional[Path]:

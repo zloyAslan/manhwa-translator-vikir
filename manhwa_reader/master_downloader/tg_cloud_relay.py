@@ -94,10 +94,29 @@ DEFAULT_INDEX_PATH = PARENT_DIR / "cloud_index.json" if (PARENT_DIR / "cloud_ind
 DEFAULT_SESSION_PATH = PARENT_DIR / "tg_cloud_relay_session"
 
 
-DEFAULT_API_ID = 37560778
-DEFAULT_API_HASH = "307da2f94fc6450afe139c91bcc59eaa"
-DEFAULT_BOT_TOKEN = "8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA"
-DEFAULT_VAULT_INVITE = "https://t.me/+O6mlGVWzTSQ5MjVi"
+def _get_credential(key_name: str, fallback: str = "") -> str:
+    env_val = os.environ.get(key_name)
+    if env_val:
+        return env_val.strip()
+    try:
+        import importlib.util
+        vault_path = PARENT_DIR.parent / "SECRETS_VAULT.local.py"
+        if not vault_path.exists():
+            vault_path = PARENT_DIR / "SECRETS_VAULT.local.py"
+        if vault_path.exists():
+            spec = importlib.util.spec_from_file_location("secrets_vault", str(vault_path))
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                return str(getattr(mod, key_name, fallback))
+    except Exception:
+        pass
+    return fallback
+
+DEFAULT_API_ID = int(_get_credential("TELEGRAM_API_ID", "37560778") or 37560778)
+DEFAULT_API_HASH = _get_credential("TELEGRAM_API_HASH", "307da2f94fc6450afe139c91bcc59eaa")
+DEFAULT_BOT_TOKEN = _get_credential("TELEGRAM_BOT_TOKEN", "")
+DEFAULT_VAULT_INVITE = _get_credential("TELEGRAM_VAULT_INVITE", "https://t.me/+O6mlGVWzTSQ5MjVi")
 
 VALID_EXTENSIONS = {".pdf", ".zip", ".cbz", ".cbr", ".rar"}
 STOP_WORDS = {

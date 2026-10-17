@@ -300,10 +300,11 @@ class RollingRAMCache(QObject):
     preload_finished_signal = pyqtSignal(int)
     preload_failed_signal = pyqtSignal(int, str)
 
-    def __init__(self, stream_client: TelegramStreamClient, channel_target: Any):
+    def __init__(self, stream_client: TelegramStreamClient, channel_target: Any, max_cached_chapters: int = 3):
         super().__init__()
         self.stream_client = stream_client
         self.channel_target = channel_target
+        self.max_cached_chapters = max(2, max_cached_chapters)
 
         # Map: chapter_num -> list of QPixmap
         self.rendered_pages: Dict[int, List[Tuple[QPixmap, str]]] = {}
@@ -314,6 +315,21 @@ class RollingRAMCache(QObject):
         self.chapter_msg_map: Dict[int, int] = {}  # chapter_num -> message_id
 
         self.active_workers: Dict[int, StreamDownloadThread] = {}
+
+    def _enforce_cache_limits(self):
+        """Enforces max_cached_chapters to prevent unbounded RAM usage."""
+        if len(self.rendered_pages) > self.max_cached_chapters:
+            # Keep current_chapter, current_chapter + 1, current_chapter - 1 prioritized
+            preferred = {self.current_chapter, self.current_chapter + 1, self.current_chapter - 1}
+            candidates = [c for c in self.rendered_pages.keys() if c not in preferred]
+            # If all are in preferred (e.g. max_cached_chapters == 2), evict the farthest from current
+            if not candidates:
+                candidates = sorted(self.rendered_pages.keys(), key=lambda c: abs(c - self.current_chapter), reverse=True)
+            for c in candidates:
+                if len(self.rendered_pages) <= self.max_cached_chapters:
+                    break
+                self.evict_chapter(c)
+
 
     def set_chapter_map(self, ch_map: Dict[int, int]):
         self.chapter_msg_map = dict(ch_map)
@@ -337,6 +353,7 @@ class RollingRAMCache(QObject):
 
         doc.close()
         self.rendered_pages[ch_num] = page_list
+        self._enforce_cache_limits()
         return page_list
 
     def request_preload(self, ch_num: int):

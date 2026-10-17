@@ -66,6 +66,15 @@ class AIService:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
                             return parts[0].get("text", "").strip()
+                elif resp.status_code == 429:
+                    err_json = {}
+                    try:
+                        err_json = resp.json().get("error", {})
+                        err_msg = err_json.get("message", "Перевищено ліміт запитів (Rate Limit).")
+                    except Exception:
+                        err_msg = "Перевищено ліміт запитів (Rate Limit)."
+                    last_error = f"{model}: Ліміт запитів вичерпано (HTTP 429). Спробуйте через кілька секунд."
+                    continue
                 else:
                     # If 503 (high demand) or 404 (deprecated), continue immediately to next model in loop
                     err_json = {}

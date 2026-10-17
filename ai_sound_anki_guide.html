@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M_Translate & Manhwa Reader — Power Companion: AI, Anki & Sound Engine Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080A0F;
+      --card-bg: rgba(16, 20, 32, 0.92);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #F59E0B;
+      --accent-grad: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+      --cyan: #2DD4BF;
+      --cyan-grad: linear-gradient(135deg, #2DD4BF 0%, #0D9488 100%);
+      --sky: #38BDF8;
+      --purple: #A855F7;
+      --text: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      padding: 30px 20px 80px;
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.09) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(45, 212, 191, 0.07) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.04) 0%, transparent 50%);
+      min-height: 100vh;
+    }
+
+    .container { max-width: 980px; margin: 0 auto; }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .tg-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38BDF8;
+      padding: 7px 18px;
+      border-radius: 9999px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .tg-pill:hover {
+      background: rgba(56, 189, 248, 0.25);
+      color: #fff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);
+    }
+    .lang-bar {
+      display: flex;
+      gap: 8px;
+    }
+    .lang-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font);
+    }
+    .lang-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+    .lang-btn.active {
+      background: var(--accent-grad);
+      color: #000;
+      border-color: transparent;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+      padding: 38px 26px;
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #F59E0B, #A855F7, #2DD4BF, #38BDF8);
+    }
+    .badge-ver {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      background: rgba(168, 85, 247, 0.15);
+      color: #C084FC;
+      border: 1px solid rgba(168, 85, 247, 0.35);
+    }
+    h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+    h1 span.gold { background: var(--accent-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    h1 span.purple { background: linear-gradient(135deg, #C084FC, #A855F7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    h1 span.cyan { background: var(--cyan-grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--text-muted); font-size: 1rem; max-width: 760px; margin: 0 auto; line-height: 1.6; }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(13, 16, 26, 0.85);
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      flex: 1 1 140px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: #000;
+      background: var(--accent-grad);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Tab Panes */
+    .tab-pane { display: none; animation: fadeIn 0.22s ease; }
+    .tab-pane.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 22px;
+    }
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Steps */
+    .step-item { display: flex; gap: 16px; margin-bottom: 22px; }
+    .step-num {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: var(--accent-grad);
+      color: #000; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 1.1rem;
+    }
+    .step-content { flex: 1; }
+    .step-content h3 { font-size: 1.05rem; margin-bottom: 6px; color: #fff; }
+    .step-content p { color: var(--text-muted); font-size: 0.93rem; line-height: 1.6; }
+
+    /* Grids */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 18px 0; }
+    .grid-item {
+      background: rgba(13, 16, 26, 0.65);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .grid-item h4 { font-size: 1.02rem; margin-bottom: 8px; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .grid-item p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.55; }
+
+    /* Alerts */
+    .alert {
+      border-radius: 12px; padding: 16px 20px; margin: 18px 0;
+      display: flex; gap: 14px; align-items: flex-start; font-size: 0.93rem;
+    }
+    .alert-gold { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #FDE68A; }
+    .alert-cyan { background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.3); color: #99F6E4; }
+    .alert-blue { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: #BAE6FD; }
+    .alert-purple { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); color: #E9D5FF; }
+    .alert-danger { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #FCA5A5; }
+
+    /* Keyboard hotkey pills */
+    .kbd {
+      display: inline-block; padding: 2px 7px;
+      font-family: var(--mono); font-size: 0.8rem; font-weight: 700;
+      color: #F3F4F6; background: #1F2937;
+      border: 1px solid #374151; border-bottom-width: 2px; border-radius: 6px;
+    }
+    code {
+      font-family: var(--mono); background: rgba(0, 0, 0, 0.5);
+      padding: 3px 8px; border-radius: 6px; color: #F59E0B;
+      font-size: 0.88em; border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* CTA Box */
+    .tg-cta {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14) 0%, rgba(14, 116, 144, 0.18) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      margin: 22px 0;
+    }
+    .tg-cta h3 { font-size: 1.25rem; color: #fff; margin-bottom: 8px; }
+    .tg-cta p { font-size: 0.93rem; color: var(--text-muted); margin-bottom: 16px; }
+    .tg-btn-large {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #229ED9;
+      color: #fff;
+      font-weight: 800;
+      text-decoration: none;
+      padding: 11px 26px;
+      border-radius: 10px;
+      font-size: 0.96rem;
+      transition: all 0.2s ease;
+    }
+    .tg-btn-large:hover {
+      background: #2cb5f6;
+      box-shadow: 0 4px 18px rgba(34, 158, 217, 0.45);
+      transform: translateY(-2px);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 45px;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Top Bar: Telegram Pill + Language Switcher -->
+  <div class="top-bar">
+    <a href="https://t.me/lm_reader" target="_blank" class="tg-pill">
+      ✈️ <span id="top-tg-text">Official Telegram: @lm_reader</span>
+    </a>
+    <div class="lang-bar">
+      <button class="lang-btn active" onclick="setLang('en')">English</button>
+      <button class="lang-btn" onclick="setLang('uk')">Українська</button>
+      <button class="lang-btn" onclick="setLang('ru')">Русский</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="badge-ver" id="hdr-badge">⚡ Power Companion Guide • Dark Fantasy Edition</div>
+    <h1 id="hdr-title"><span class="gold">AI Engine</span>, <span class="purple">Smart Sound</span> & <span class="cyan">Anki Integration</span></h1>
+    <p class="subtitle" id="hdr-sub">
+      A straight-to-the-point guide: how to get your free Gemini API key, why AnkiConnect saves hours of manual work, how adaptive 3-layer Foley sound works, and our strict local privacy philosophy.
+    </p>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="openTab('gemini_api')" id="tab-btn-gemini">🔑 Gemini AI Setup</button>
+    <button class="tab-btn" onclick="openTab('sound_engine')" id="tab-btn-sound">🎧 3-Layer Sound Engine</button>
+    <button class="tab-btn" onclick="openTab('anki_connect')" id="tab-btn-anki">🗂️ Anki & AnkiConnect</button>
+    <button class="tab-btn" onclick="openTab('sound_packs')" id="tab-btn-packs">🎼 Setting Soundpacks</button>
+    <button class="tab-btn" onclick="openTab('privacy_rules')" id="tab-btn-privacy">🛡️ Privacy & Philosophy</button>
+  </nav>
+
+  <!-- TAB 1: GEMINI AI SETUP -->
+  <div id="tab-gemini_api" class="tab-pane active">
+    <div class="card">
+      <div class="card-title" id="gem-title">🔑 Google Gemini AI: Setup, Plan & Why You Need It</div>
+      <p style="color:var(--text-muted); font-size:0.95rem; margin-bottom:18px;" id="gem-desc">
+        We don't sell subscriptions or charge for AI tokens. Instead, you connect your own personal Google Gemini key directly to Google's official free tier.
+      </p>
+
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3 id="gem-s1-h">Where to get the key? (100% Free)</h3>
+          <p id="gem-s1-p">
+            Go to <b><a href="https://aistudio.google.com" target="_blank" style="color:#38BDF8; text-decoration:none; font-weight:700;">Google AI Studio (aistudio.google.com)</a></b>, log in with any Google account, and click the blue <b>"Create API Key"</b> button. It takes 20 seconds.
+          </p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3 id="gem-s2-h">What plan/tier is this?</h3>
+          <p id="gem-s2-p">
+            This is the <b>Google Free Tier</b>. It provides generous rate limits (up to 15 requests per minute and 1,500 daily requests), which is more than enough to read dozens of manhwa chapters daily. You do not need to link a credit card.
+          </p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3 id="gem-s3-h">Where do I paste it?</h3>
+          <p id="gem-s3-p">
+            In <b>M_Translate</b>, open <b>Settings (⚙) ➔ AI Gemini</b> tab, paste your key, and click Save. The key is stored locally on your PC in <code>config.json</code> and never shared with anyone.
+          </p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3 id="gem-s4-h">What does the AI actually do in the app?</h3>
+          <p id="gem-s4-p">
+            <b>1. Slang & Idiom Breakdown:</b> Explains manhwa insults, archaic royal titles, comic sound effects (SFX), and character tone beyond dry dictionary words.<br>
+            <b>2. Soundscore Composer:</b> Scans chapter panels to generate an adaptive <code>sound_timeline.json</code>, matching character moods and locations with Foley audio.
+          </p>
+        </div>
+      </div>
+
+      <div class="alert alert-cyan" id="gem-alert">
+        <span>💡 <b>Language of Explanations:</b> In settings, you can choose whether Gemini answers and explains nuances in English, Ukrainian, or Russian.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: 3-LAYER SOUND ENGINE -->
+  <div id="tab-sound_engine" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="snd-title">🎧 Adaptive 3-Layer Sound Engine & Scene Recognition</div>
+      <p style="color:var(--text-muted); font-size:0.95rem; margin-bottom:18px;" id="snd-desc">
+        Standard readers either play dead silence or loop a boring 3-minute MP3 that ruins the mood during battle scenes. Our sound engine treats your manhwa like a movie soundtrack:
+      </p>
+
+      <div class="grid">
+        <div class="grid-item">
+          <h4 id="snd-c1-h">🎼 Layer 1: Melody & Mood (BG)</h4>
+          <p id="snd-c1-p">The emotional theme: a melancholy cello during a tragedy, gentle flutes in a quiet forest, or rising orchestral battle drums. Spans smoothly across 5–15 panels without sudden jarring cuts.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="snd-c2-h">🌲 Layer 2: Scene Ambience (AMB)</h4>
+          <p id="snd-c2-p">Physical space acoustics: water drops in damp dungeons, crackling hearth fire in taverns, howling mountain blizzards, or crowd whispers in royal ballrooms.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="snd-c3-h">⚔️ Layer 3: Dynamic Action & Loops (SFX)</h4>
+          <p id="snd-c3-p">Action cues: sword parries, magic fire blasts, monster roars, frantic heartbeats, or horse gallops that silence naturally as soon as combat ends.</p>
+        </div>
+      </div>
+
+      <div class="alert alert-purple" id="snd-zero-lag">
+        <div>
+          <b id="snd-cache-h">⚡ Zero-Lag Cache Hit (0.001s):</b>
+          <p id="snd-cache-p" style="margin-top:4px;">
+            The Gemini AI only analyzes each chapter <b>once</b>. It writes a lightweight <code>sound_timeline.json</code> directly in the chapter folder. The next time you open that chapter, the sound engine boots in <b>less than 1 millisecond</b> with zero internet connection needed.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: ANKI & ANKICONNECT -->
+  <div id="tab-anki_connect" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="ank-title">🗂️ Anki & AnkiConnect: What It Is & Why It's Built-In</div>
+      <p style="color:var(--text-muted); font-size:0.95rem; margin-bottom:18px;" id="ank-desc">
+        <b>Anki</b> is the gold standard for spaced-repetition flashcards. But making manhwa cards manually (copying words, sentence context, screenshotting character art) takes 1–2 minutes per card. M_Translate does it in <b>2 seconds</b> without switching windows.
+      </p>
+
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3 id="ank-s1-h">Step 1: Install Anki on PC</h3>
+          <p id="ank-s1-p">Download the official Anki application from <b><a href="https://apps.ankiweb.net" target="_blank" style="color:#38BDF8; text-decoration:none; font-weight:700;">apps.ankiweb.net</a></b>. It's completely free for Windows.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3 id="ank-s2-h">Step 2: Install the official AnkiConnect plugin</h3>
+          <p id="ank-s2-p">
+            In Anki, click <b>Tools ➔ Add-ons ➔ Get Add-ons...</b>, paste code <code>2055492159</code>, and press OK. Restart Anki and leave it running in the background.
+          </p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3 id="ank-s3-h">Step 3: Instant 1-Click Cards</h3>
+          <p id="ank-s3-p">
+            When reading, press <span class="kbd">Alt</span> + <span class="kbd">W</span> on a sentence or <span class="kbd">Alt</span> + <span class="kbd">D</span> to crop the character's face. M_Translate automatically builds a stylish Dark Fantasy card with the word, sentence context, and a 16:10 art panel in your "англ манхва" deck.
+          </p>
+        </div>
+      </div>
+
+      <div class="alert alert-gold" id="ank-local-note">
+        <span>📌 <b>No Anki running? No problem:</b> If Anki is closed, M_Translate saves your cards locally into an offline SQLite database and generates an importable <code>angl_manhwa.apkg</code> deck file for you.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: SETTING SOUNDPACKS ROADMAP -->
+  <div id="tab-sound_packs" class="tab-pane">
+    <div class="card">
+      <div class="card-title" id="sp-title">🎼 Where We're Heading: Tailored Setting Soundpacks</div>
+      <p style="color:var(--text-muted); font-size:0.95rem; margin-bottom:18px;" id="sp-desc">
+        A Dungeon Gate manhwa shouldn't sound like a Victorian tea party. We are curating dedicated soundpacks for different genres so you can download a pack from Telegram and get the perfect audio landscape:
+      </p>
+
+      <div class="grid">
+        <div class="grid-item">
+          <h4 id="sp-c1-h">🌆 Modern / Hunters / System Gates</h4>
+          <p id="sp-c1-p">Pistol shots, sniper echoes, glass shattering, bustling night rain, police sirens, holographic UI chime prompts, asphalt footsteps, and tense synth pulses.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="sp-c2-h">🏰 Medieval & Dark Fantasy</h4>
+          <p id="sp-c2-p">Heavy steel sword parries, shield clashes, dungeon water dripping, tavern laughter, dragon roars, and sweeping orchestral battle themes.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="sp-c3-h">🌸 Romance & Academy Life</h4>
+          <p id="sp-c3-p">Gentle acoustic piano, school bell chimes, warm spring breeze, soft emotional flutes, and light comedic sound cues for character reactions.</p>
+        </div>
+        <div class="grid-item">
+          <h4 id="sp-c4-h">⚡ Murim & Eastern Cultivation</h4>
+          <p id="sp-c4-p">Qi energy gusts, bamboo grove wind, wooden staff impacts, traditional guzheng zither strings, and flying sword swooshes.</p>
+        </div>
+      </div>
+
+      <div class="tg-cta">
+        <h3 id="sp-cta-h">📢 Request Soundpacks on Telegram</h3>
+        <p id="sp-cta-p">Have a favorite manhwa you want soundcrafted? Join our Telegram channel and drop your title — we'll bake it into our next release!</p>
+        <a href="https://t.me/lm_reader" target="_blank" class="tg-btn-large">
+          ✈️ Join Telegram @lm_reader
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: PRIVACY & PHILOSOPHY -->
+  <div id="tab-privacy_rules" class="tab-pane">
+    <div class="card">
+      <div class="card-title" style="color:#F87171;" id="prv-title">🛡️ Strict Local Privacy & Our Philosophy</div>
+
+      <div class="alert alert-danger">
+        <div>
+          <b id="prv-box1-h">🔒 100% Offline OCR (No Screen Spying):</b>
+          <p id="prv-box1-p" style="margin-top:4px;">
+            The neural text recognition engine (RapidOCR) runs <b>entirely offline on your computer's CPU</b>. When you snip a word or dialogue bubble, the screenshot is processed purely in RAM and never leaves your computer. We do not run background servers that collect your screen data.
+          </p>
+        </div>
+      </div>
+
+      <div class="alert alert-gold">
+        <div>
+          <b id="prv-box2-h">🧹 Clean Portable Footprint:</b>
+          <p id="prv-box2-p" style="margin-top:4px;">
+            Zero Windows registry modification, zero background telemetry services, zero bloat. If you move or delete the app folder, no traces remain on your system.
+          </p>
+        </div>
+      </div>
+
+      <h3 style="color:#fff; margin:22px 0 10px; font-size:1.05rem;" id="prv-disc-h">⚠️ Disclaimer (Educational & Personal Use Only):</h3>
+      <p style="color:var(--text-muted); font-size:0.93rem; line-height:1.6;" id="prv-disc-p">
+        This software suite is developed strictly for non-commercial educational purposes, foreign language learning, and personal document viewing. All manhwa copyrights, artwork, characters, and trademarks belong exclusively to their respective authors and publishing houses. The app does not host or distribute proprietary content.
+      </p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p id="footer-text">M_Translate & Manhwa Reader Ecosystem • Companion Guide • 2026</p>
+    <p style="margin-top:8px;">
+      <a href="https://t.me/lm_reader" target="_blank" style="color:#38BDF8; text-decoration:none; font-weight:700;">
+        ✈️ Official Telegram Channel: @lm_reader
+      </a>
+    </p>
+  </footer>
+</div>
+
+<script>
+  const i18n = {
+    en: {
+      topTg: "Official Telegram: @lm_reader",
+      hdrBadge: "⚡ Power Companion Guide • Dark Fantasy Edition",
+      hdrTitle: "<span class='gold'>AI Engine</span>, <span class='purple'>Smart Sound</span> & <span class='cyan'>Anki Integration</span>",
+      hdrSub: "A straight-to-the-point guide: how to get your free Gemini API key, why AnkiConnect saves hours of manual work, how adaptive 3-layer Foley sound works, and our strict local privacy philosophy.",
+      tabGemini: "🔑 Gemini AI Setup",
+      tabSound: "🎧 3-Layer Sound Engine",
+      tabAnki: "🗂️ Anki & AnkiConnect",
+      tabPacks: "🎼 Setting Soundpacks",
+      tabPrivacy: "🛡️ Privacy & Philosophy",
+      gemTitle: "🔑 Google Gemini AI: Setup, Plan & Why You Need It",
+      gemDesc: "We don't sell subscriptions or charge for AI tokens. Instead, you connect your own personal Google Gemini key directly to Google's official free tier.",
+      gemS1H: "Where to get the key? (100% Free)",
+      gemS1P: "Go to Google AI Studio (aistudio.google.com), log in with any Google account, and click the blue 'Create API Key' button. It takes 20 seconds.",
+      gemS2H: "What plan/tier is this?",
+      gemS2P: "This is the Google Free Tier. It provides generous rate limits (up to 15 requests per minute and 1,500 daily requests), which is more than enough to read dozens of manhwa chapters daily. You do not need to link a credit card.",
+      gemS3H: "Where do I paste it?",
+      gemS3P: "In M_Translate, open Settings (⚙) ➔ AI Gemini tab, paste your key, and click Save. The key is stored locally on your PC in config.json and never shared with anyone.",
+      gemS4H: "What does the AI actually do in the app?",
+      gemS4P: "<b>1. Slang & Idiom Breakdown:</b> Explains manhwa insults, archaic royal titles, comic sound effects (SFX), and character tone beyond dry dictionary words.<br><b>2. Soundscore Composer:</b> Scans chapter panels to generate an adaptive sound_timeline.json, matching character moods and locations with Foley audio.",
+      gemAlert: "💡 <b>Language of Explanations:</b> In settings, you can choose whether Gemini answers and explains nuances in English, Ukrainian, or Russian.",
+      sndTitle: "🎧 Adaptive 3-Layer Sound Engine & Scene Recognition",
+      sndDesc: "Standard readers either play dead silence or loop a boring 3-minute MP3 that ruins the mood during battle scenes. Our sound engine treats your manhwa like a movie soundtrack:",
+      sndC1H: "🎼 Layer 1: Melody & Mood (BG)",
+      sndC1P: "The emotional theme: a melancholy cello during a tragedy, gentle flutes in a quiet forest, or rising orchestral battle drums. Spans smoothly across 5–15 panels without sudden jarring cuts.",
+      sndC2H: "🌲 Layer 2: Scene Ambience (AMB)",
+      sndC2P: "Physical space acoustics: water drops in damp dungeons, crackling hearth fire in taverns, howling mountain blizzards, or crowd whispers in royal ballrooms.",
+      sndC3H: "⚔️ Layer 3: Dynamic Action & Loops (SFX)",
+      sndC3P: "Action cues: sword parries, magic fire blasts, monster roars, frantic heartbeats, or horse gallops that silence naturally as soon as combat ends.",
+      sndCacheH: "⚡ Zero-Lag Cache Hit (0.001s):",
+      sndCacheP: "The Gemini AI only analyzes each chapter once. It writes a lightweight sound_timeline.json directly in the chapter folder. The next time you open that chapter, the sound engine boots in less than 1 millisecond with zero internet connection needed.",
+      ankTitle: "🗂️ Anki & AnkiConnect: What It Is & Why It's Built-In",
+      ankDesc: "Anki is the gold standard for spaced-repetition flashcards. But making manhwa cards manually (copying words, sentence context, screenshotting character art) takes 1–2 minutes per card. M_Translate does it in 2 seconds without switching windows.",
+      ankS1H: "Step 1: Install Anki on PC",
+      ankS1P: "Download the official Anki application from apps.ankiweb.net. It's completely free for Windows.",
+      ankS2H: "Step 2: Install the official AnkiConnect plugin",
+      ankS2P: "In Anki, click Tools ➔ Add-ons ➔ Get Add-ons..., paste code 2055492159, and press OK. Restart Anki and leave it running in the background.",
+      ankS3H: "Step 3: Instant 1-Click Cards",
+      ankS3P: "When reading, press Alt + W on a sentence or Alt + D to crop the character's face. M_Translate automatically builds a stylish Dark Fantasy card with the word, sentence context, and a 16:10 art panel in your 'англ манхва' deck.",
+      ankLocalNote: "📌 <b>No Anki running? No problem:</b> If Anki is closed, M_Translate saves your cards locally into an offline SQLite database and generates an importable angl_manhwa.apkg deck file for you.",
+      spTitle: "🎼 Where We're Heading: Tailored Setting Soundpacks",
+      spDesc: "A Dungeon Gate manhwa shouldn't sound like a Victorian tea party. We are curating dedicated soundpacks for different genres so you can download a pack from Telegram and get the perfect audio landscape:",
+      spC1H: "🌆 Modern / Hunters / System Gates",
+      spC1P: "Pistol shots, sniper echoes, glass shattering, bustling night rain, police sirens, holographic UI chime prompts, asphalt footsteps, and tense synth pulses.",
+      spC2H: "🏰 Medieval & Dark Fantasy",
+      spC2P: "Heavy steel sword parries, shield clashes, dungeon water dripping, tavern laughter, dragon roars, and sweeping orchestral battle themes.",
+      spC3H: "🌸 Romance & Academy Life",
+      spC3P: "Gentle acoustic piano, school bell chimes, warm spring breeze, soft emotional flutes, and light comedic sound cues for character reactions.",
+      spC4H: "⚡ Murim & Eastern Cultivation",
+      spC4P: "Qi energy gusts, bamboo grove wind, wooden staff impacts, traditional guzheng zither strings, and flying sword swooshes.",
+      spCtaH: "📢 Request Soundpacks on Telegram",
+      spCtaP: "Have a favorite manhwa you want soundcrafted? Join our Telegram channel and drop your title — we'll bake it into our next release!",
+      prvTitle: "🛡️ Strict Local Privacy & Our Philosophy",
+      prvBox1H: "🔒 100% Offline OCR (No Screen Spying):",
+      prvBox1P: "The neural text recognition engine (RapidOCR) runs entirely offline on your computer's CPU. When you snip a word or dialogue bubble, the screenshot is processed purely in RAM and never leaves your computer. We do not run background servers that collect your screen data.",
+      prvBox2H: "🧹 Clean Portable Footprint:",
+      prvBox2P: "Zero Windows registry modification, zero background telemetry services, zero bloat. If you move or delete the app folder, no traces remain on your system.",
+      prvDiscH: "⚠️ Disclaimer (Educational & Personal Use Only):",
+      prvDiscP: "This software suite is developed strictly for non-commercial educational purposes, foreign language learning, and personal document viewing. All manhwa copyrights, artwork, characters, and trademarks belong exclusively to their respective authors and publishing houses. The app does not host or distribute proprietary content.",
+      footerText: "M_Translate & Manhwa Reader Ecosystem • Companion Guide • 2026"
+    },
+    uk: {
+      topTg: "Офіційний Telegram: @lm_reader",
+      hdrBadge: "⚡ Спеціальний посібник • Dark Fantasy Edition",
+      hdrTitle: "<span class='gold'>ШІ Gemini</span>, <span class='purple'>Розумний звук</span> & <span class='cyan'>Інтеграція з Anki</span>",
+      hdrSub: "Чітко та по суті: де взяти безкоштовний ключ Gemini, як AnkiConnect зберігає години часу, як працює 3-шаровий звук Foley і наша філософія повної локальної приватності.",
+      tabGemini: "🔑 ШІ Gemini: Ключ і Тариф",
+      tabSound: "🎧 3-Шаровий Звуковий Рушій",
+      tabAnki: "🗂️ Anki та AnkiConnect",
+      tabPacks: "🎼 Паки звуків під сетинги",
+      tabPrivacy: "🛡️ Приватність та Філософія",
+      gemTitle: "🔑 Google Gemini AI: Як підключити, який тариф і для чого",
+      gemDesc: "Ми не продаємо підписок і не беремо грошей за токени. Ви підключаєте власний персональний ключ Gemini напряму до офіційного безкоштовного тарифу Google.",
+      gemS1H: "Де взяти ключ? (100% Безкоштовно)",
+      gemS1P: "Зайдіть на Google AI Studio (aistudio.google.com), авторизуйтесь через звичайний Google-акаунт і натисніть синю кнопку 'Create API Key'. Це займає рівно 20 секунд.",
+      gemS2H: "Який це тариф?",
+      gemS2P: "Це офіційний Google Free Tier. Він дає щедрі безкоштовні ліміти (до 15 запитів за хвилину і 1,500 запитів на добу) — цього з головою вистачає, щоб читати десятки глав манхви щодня. Банківську картку прив'язувати не потрібно.",
+      gemS3H: "Куди його вставити?",
+      gemS3P: "У перекладачі M_Translate відкрийте Налаштування (⚙) ➔ вкладку AI Gemini, вставте ваш ключ і натисніть Зберегти. Ключ зберігається тільки на вашому ПК у config.json і нікуди не передається.",
+      gemS4H: "Що ШІ робить у програмі?",
+      gemS4P: "<b>1. Розбір сленгу та ідіом:</b> пояснює лайку персонажів, сленг, стародавні титули, коміксні вигуки (SFX) та контекст, який звичайні словники не розуміють.<br><b>2. Композитор звуку:</b> сканує сцени в главі і створює адаптивний sound_timeline.json під настрій подій.",
+      gemAlert: "💡 <b>Мова відповідей ШІ:</b> У налаштуваннях можна вибрати, якою мовою Gemini пояснюватиме граматику (Українська, English чи Русский).",
+      sndTitle: "🎧 Адаптивний 3-шаровий звук та розпізнавання сцен",
+      sndDesc: "Звичайні читалки або мовчать, або пускають на репіті нудний 3-хвилинний трек, який дратує під час битви. Наш рушій працює як живий саундтрек до фільму:",
+      sndC1H: "🎼 Шар 1: Мелодія настрою (BG)",
+      sndC1P: "Емоційна тема: сумна віолончель у момент драми, лірична флейта у спокійному лісі чи воєнні барабани перед зіткненням. Грає плавно крізь 5–15 панелей без обривів.",
+      sndC2H: "🌲 Шар 2: Фізичне оточення (AMB)",
+      sndC2P: "Акустика місця: краплі води в сирій печері, камін у таверні, завивання заметілі на засніжених вершинах чи шепіт зали на балу.",
+      sndC3H: "⚔️ Шар 3: Динамічний екшн та лупи (SFX)",
+      sndC3P: "Точкові звуки бою: дзвін клинків, вибухи магії, крик монстра, тривожне биття серця чи тупіт кінського галопу, який сам затухає, коли бій завершено.",
+      sndCacheH: "⚡ Миттєвий кеш (0.001 секунди):",
+      sndCacheP: "ШІ аналізує розділ лише один раз. Він зберігає легкий sound_timeline.json прямо в папку глави. Наступного разу музика стартує за менш ніж 1 мілісекунду без інтернету та без витрати токенів.",
+      ankTitle: "🗂️ Anki та AnkiConnect: Що це і навіщо це вбудовано",
+      ankDesc: "Anki — це світовий стандарт інтервальних повторень. Але створення карток вручну (копіювання слова, речення, скріншот арту) займає 1–2 хвилини на слово. M_Translate робить це за 2 секунди прямо під час читання.",
+      ankS1H: "Крок 1: Встановіть Anki на комп'ютер",
+      ankS1P: "Завантажте програму Anki з офіційного сайту apps.ankiweb.net. Вона повністю безкоштовна.",
+      ankS2H: "Крок 2: Встановіть офіційний плагін AnkiConnect",
+      ankS2P: "В Anki виберіть Інструменти ➔ Додатки ➔ Завантажити, вставте код 2055492159 і натисніть ОК. Перезапустіть Anki і залиште його відкритим у фоні.",
+      ankS3H: "Крок 3: Картки в 1 клік",
+      ankS3P: "Під час читання натисніть Alt + W для виділення речення або Alt + D для кадру обличчя персонажа. Програма сама збирає стильну картку в темній темі у вашій колоді 'англ манхва'. Жодного ручного копіпасту.",
+      ankLocalNote: "📌 <b>Anki не запущено? Без проблем:</b> якщо Anki закрито, програма зберігає картки в локальну SQLite базу і автоматично збирає файл angl_manhwa.apkg, який можна імпортувати пізніше.",
+      spTitle: "🎼 Куди ми рухаємось: Звукові паки під різні сетинги",
+      spDesc: "Манхва про мисливців та підземелля не повинна звучати як бал у палаці. Ми готуємо готові звукові добірки під кожен жанр, які можна просто завантажити з Telegram:",
+      spC1H: "🌆 Сучасний світ / Хантери / Врата",
+      spC1P: "Постріли пістолетів, брязкіт розбитого скла, нічне місто під дощем, сирени поліції, голографічні звуки квестів системи, кроки по асфальту та синтові пульси напруження.",
+      spC2H: "🏰 Середньовіччя & Темне Фентезі",
+      spC2P: "Дзвін важких сталевих мечів, удари по щитах, луна підземель, потріскування дров у таверні, рик драконів та оркестрова музика битв.",
+      spC3H: "🌸 Романтика & Академія",
+      spC3P: "Тепле акустичне піаніно, шкільні дзвінки, весняний вітерець, м'які флейти та забавні звукові ефекти для комедійних реакцій персонажів.",
+      spC4H: "⚡ Мурім & Східне культивування",
+      spC4P: "Потоки енергії ці, свист бамбукового гаю, удари дерев'яних палиць, традиційний гучжен та розсікання повітря мечами, що летять.",
+      spCtaH: "📢 Замовляйте звукові паки в Telegram",
+      spCtaP: "Читаєте конкретну манхву і хочете атмосферний звук під неї? Пишіть назву в Telegram-канал — ми зробимо добірку для наступного релізу!",
+      prvTitle: "🛡️ Повна локальна приватність та Філософія",
+      prvBox1H: "🔒 100% Офлайн OCR (Жодного шпигунства за екраном):",
+      prvBox1P: "Нейромережа розпізнавання тексту (RapidOCR) працює повністю офлайн на вашому процесорі. Коли ви обводите слово чи репліку, скріншот обробляється суто в оперативній пам'яті і ніколи не залишає ПК. Ми не тримаємо серверів, які б збирали зображення вашого екрана.",
+      prvBox2H: "🧹 Чистота системи (Portable):",
+      prvBox2P: "Жодних записів у реєстр Windows, прихованих фонових служб чи телеметрії. Якщо перемістити чи видалити папку з програмою — на комп'ютері не залишиться жодного сліду.",
+      prvDiscH: "⚠️ Дисклеймер (Освітні та особисті цілі):",
+      prvDiscP: "Програмний комплекс створено виключно для некомерційного використання, особистого перегляду та вивчення іноземних мов. Усі авторські права на манхву, оригінальний арт та торгові марки належать їхнім авторам та видавництвам. Програма не зберігає і не розповсюджує піратський контент.",
+      footerText: "M_Translate & Manhwa Reader Ecosystem • Companion Guide • 2026"
+    },
+    ru: {
+      topTg: "Официальный Telegram: @lm_reader",
+      hdrBadge: "⚡ Специальный гайд • Dark Fantasy Edition",
+      hdrTitle: "<span class='gold'>ИИ Gemini</span>, <span class='purple'>Умный звук</span> & <span class='cyan'>Интеграция с Anki</span>",
+      hdrSub: "Коротко и по делу: где взять бесплатный ключ Gemini, как AnkiConnect экономит часы времени, как работает 3-слойный звук Foley и наша философия полной локальной приватности.",
+      tabGemini: "🔑 ИИ Gemini: Ключ и Тариф",
+      tabSound: "🎧 3-Слойный Звуковой Движок",
+      tabAnki: "🗂️ Anki и AnkiConnect",
+      tabPacks: "🎼 Паки звуков под сеттинги",
+      tabPrivacy: "🛡️ Приватность и Философия",
+      gemTitle: "🔑 Google Gemini AI: Как подключить, какой тариф и зачем",
+      gemDesc: "Мы не продаем подписки и не берем деньги за токены. Вы подключаете свой личный ключ Gemini напрямую к официальному бесплатному тарифу Google.",
+      gemS1H: "Где взять ключ? (100% Бесплатно)",
+      gemS1P: "Зайдите на Google AI Studio (aistudio.google.com), войдите под обычным Google-аккаунтом и нажмите синюю кнопку 'Create API Key'. Это занимает 20 секунд.",
+      gemS2H: "Какой это тариф?",
+      gemS2P: "Это официальный Google Free Tier. Он дает щедрые бесплатные лимиты (до 15 запросов в минуту и 1,500 запросов в день) — этого с головой хватает на десятки глав ежедневно. Привязывать карту не нужно.",
+      gemS3H: "Куда его вставить?",
+      gemS3P: "В переводчике M_Translate откройте Настройки (⚙) ➔ вкладку AI Gemini, вставьте ключ и нажмите Сохранить. Ключ хранится только на вашем ПК в config.json и никуда не передается.",
+      gemS4H: "Что ИИ делает в программе?",
+      gemS4P: "<b>1. Разбор сленга и идиом:</b> объясняет ругательства персонажей, сленг, старинные титулы, комиксные звуки (SFX) и контекст, который обычные словари не понимают.<br><b>2. Композитор звука:</b> сканирует сцены в главе и создает адаптивный sound_timeline.json под настроение событий.",
+      gemAlert: "💡 <b>Язык ответов ИИ:</b> В настройках можно выбрать, на каком языке Gemini объясняет грамматику (Украинский, English или Русский).",
+      sndTitle: "🎧 Адаптивный 3-слойный звук и распознавание сцен",
+      sndDesc: "Обычные читалки либо молчат, либо крутят на репите скучный 3-минутный трек, который раздражает во время боя. Наш движок работает как саундтрек к фильму:",
+      sndC1H: "🎼 Слой 1: Мелодия настроения (BG)",
+      sndC1P: "Эмоциональная тема: грустная виолончель в драме, флейта в спокойном лесу или боевые барабаны перед битвой. Играет плавно через 5–15 панелей без обрывов.",
+      sndC2H: "🌲 Слой 2: Физическое окружение (AMB)",
+      sndC2P: "Акустика локации: капли воды в сырой пещере, камин в таверне, завывание метели на вершинах гор или шепот в королевском зале.",
+      sndC3H: "⚔️ Слой 3: Динамичный экшен и лупы (SFX)",
+      sndC3P: "Звуки боя: звон клинков, взрывы магии, рык монстра, тревожный стук сердца или топот копыт, который сам плавно затухает, когда бой закончен.",
+      sndCacheH: "⚡ Мгновенный кэш (0.001 секунды):",
+      sndCacheP: "ИИ анализирует главу только один раз. Он сохраняет легкий sound_timeline.json прямо в папку главы. В следующий раз музыка стартует за 0.001 секунды без интернета и без траты токенов.",
+      ankTitle: "🗂️ Anki и AnkiConnect: Что это и зачем встроено",
+      ankDesc: "Anki — это мировой стандарт интервальных повторений. Но создание карточек вручную (слово, контекст, скриншот арта) занимает 1–2 минуты на слово. M_Translate делает это за 2 секунды прямо во время чтения.",
+      ankS1H: "Шаг 1: Установите Anki на компьютер",
+      ankS1P: "Скачайте официальный Anki с сайта apps.ankiweb.net. Программа полностью бесплатна.",
+      ankS2H: "Шаг 2: Установите официальный плагин AnkiConnect",
+      ankS2P: "В Anki выберите Инструменты ➔ Дополнения ➔ Загрузить, вставьте код 2055492159 и нажмите ОК. Перезапустите Anki и оставьте открытым в фоне.",
+      ankS3H: "Шаг 3: Карточки в 1 клик",
+      ankS3P: "Во время чтения нажмите Alt + W для выделения предложения или Alt + D для кадра с лицом персонажа. Программа сама соберет стильную темную карточку в колоде 'англ манхва'. Никакого ручного копирования.",
+      ankLocalNote: "📌 <b>Anki закрыт? Не проблема:</b> если Anki не запущен, программа сохраняет карточки в локальную базу SQLite и автоматически собирает файл angl_manhwa.apkg, который можно импортировать позже.",
+      spTitle: "🎼 Куда мы движемся: Звуковые паки под разные сеттинги",
+      spDesc: "Манхва про охотников и врата не должна звучать как светский бал. Мы готовим готовые подборки под каждый жанр, которые можно просто скачать из Telegram:",
+      spC1H: "🌆 Современный мир / Хантеры / Врата",
+      spC1P: "Выстрелы пистолетов, звон разбитого стекла, ночной город под дождем, сирены полиции, голографические звуки системных квестов, шаги по асфальту и синтовые пульсы напряжения.",
+      spC2H: "🏰 Средневековье & Темное Фэнтези",
+      spC2P: "Звон тяжелых мечей, удары по щитам, эхо подземелий, камин в таверне, рык драконов и оркестровая музыка битв.",
+      spC3H: "🌸 Романтика & Академия",
+      spC3P: "Теплое акустическое пианино, школьные звонки, весенний ветер, мягкие флейты и забавные звуковые эффекты для комедийных реакций персонажей.",
+      spC4H: "⚡ Мурим & Восточные боевые искусства",
+      spC4P: "Потоки энергии ци, свист бамбукового леса, удары деревянных шестов, традиционный гучжэн и рассекающие воздух летящие мечи.",
+      spCtaH: "📢 Заказывайте звуковые паки в Telegram",
+      spCtaP: "Читаете определенную манхву и хотите атмосферный звук под нее? Пишите название в Telegram-канал — мы сделаем подборку для следующего релиза!",
+      prvTitle: "🛡️ Полная локальная приватность и Философия",
+      prvBox1H: "🔒 100% Офлайн OCR (Никакого шпионажа за экраном):",
+      prvBox1P: "Нейросеть распознавания текста (RapidOCR) работает полностью офлайн на вашем процессоре. Когда вы выделяете слово или реплику, снимок обрабатывается исключительно в оперативной памяти и никогда не покидает ПК. Мы не держим серверов, собирающих изображения вашего экрана.",
+      prvBox2H: "🧹 Чистота системы (Portable):",
+      prvBox2P: "Никаких записей в реестр Windows, скрытых служб или телеметрии. Если переместить или удалить папку с программой — на компьютере не останется никаких следов.",
+      prvDiscH: "⚠️ Отказ от ответственности:",
+      prvDiscP: "Программный комплекс создан исключительно для некоммерческого личного использования, чтения и изучения иностранных языков. Все авторские права на манхву, оригинальный арт и торговые марки принадлежат их авторам и издательствам. Программа не хранит и не распространяет пиратский контент.",
+      footerText: "M_Translate & Manhwa Reader Ecosystem • Companion Guide • 2026"
+    }
+  };
+
+  function setLang(lang) {
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    const d = i18n[lang];
+    if (!d) return;
+
+    document.getElementById('top-tg-text').innerText = d.topTg;
+    document.getElementById('hdr-badge').innerText = d.hdrBadge;
+    document.getElementById('hdr-title').innerHTML = d.hdrTitle;
+    document.getElementById('hdr-sub').innerText = d.hdrSub;
+
+    document.getElementById('tab-btn-gemini').innerText = d.tabGemini;
+    document.getElementById('tab-btn-sound').innerText = d.tabSound;
+    document.getElementById('tab-btn-anki').innerText = d.tabAnki;
+    document.getElementById('tab-btn-packs').innerText = d.tabPacks;
+    document.getElementById('tab-btn-privacy').innerText = d.tabPrivacy;
+
+    document.getElementById('gem-title').innerText = d.gemTitle;
+    document.getElementById('gem-desc').innerText = d.gemDesc;
+    document.getElementById('gem-s1-h').innerText = d.gemS1H;
+    document.getElementById('gem-s1-p').innerHTML = d.gemS1P;
+    document.getElementById('gem-s2-h').innerText = d.gemS2H;
+    document.getElementById('gem-s2-p').innerHTML = d.gemS2P;
+    document.getElementById('gem-s3-h').innerText = d.gemS3H;
+    document.getElementById('gem-s3-p').innerHTML = d.gemS3P;
+    document.getElementById('gem-s4-h').innerText = d.gemS4H;
+    document.getElementById('gem-s4-p').innerHTML = d.gemS4P;
+    document.getElementById('gem-alert').innerHTML = d.gemAlert;
+
+    document.getElementById('snd-title').innerText = d.sndTitle;
+    document.getElementById('snd-desc').innerText = d.sndDesc;
+    document.getElementById('snd-c1-h').innerText = d.sndC1H;
+    document.getElementById('snd-c1-p').innerText = d.sndC1P;
+    document.getElementById('snd-c2-h').innerText = d.sndC2H;
+    document.getElementById('snd-c2-p').innerText = d.sndC2P;
+    document.getElementById('snd-c3-h').innerText = d.sndC3H;
+    document.getElementById('snd-c3-p').innerText = d.sndC3P;
+    document.getElementById('snd-cache-h').innerText = d.sndCacheH;
+    document.getElementById('snd-cache-p').innerText = d.sndCacheP;
+
+    document.getElementById('ank-title').innerText = d.ankTitle;
+    document.getElementById('ank-desc').innerText = d.ankDesc;
+    document.getElementById('ank-s1-h').innerText = d.ankS1H;
+    document.getElementById('ank-s1-p').innerHTML = d.ankS1P;
+    document.getElementById('ank-s2-h').innerText = d.ankS2H;
+    document.getElementById('ank-s2-p').innerHTML = d.ankS2P;
+    document.getElementById('ank-s3-h').innerText = d.ankS3H;
+    document.getElementById('ank-s3-p').innerHTML = d.ankS3P;
+    document.getElementById('ank-local-note').innerHTML = d.ankLocalNote;
+
+    document.getElementById('sp-title').innerText = d.spTitle;
+    document.getElementById('sp-desc').innerText = d.spDesc;
+    document.getElementById('sp-c1-h').innerText = d.spC1H;
+    document.getElementById('sp-c1-p').innerText = d.spC1P;
+    document.getElementById('sp-c2-h').innerText = d.spC2H;
+    document.getElementById('sp-c2-p').innerText = d.spC2P;
+    document.getElementById('sp-c3-h').innerText = d.spC3H;
+    document.getElementById('sp-c3-p').innerText = d.spC3P;
+    document.getElementById('sp-c4-h').innerText = d.spC4H;
+    document.getElementById('sp-c4-p').innerText = d.spC4P;
+    document.getElementById('sp-cta-h').innerText = d.spCtaH;
+    document.getElementById('sp-cta-p').innerText = d.spCtaP;
+
+    document.getElementById('prv-title').innerText = d.prvTitle;
+    document.getElementById('prv-box1-h').innerText = d.prvBox1H;
+    document.getElementById('prv-box1-p').innerText = d.prvBox1P;
+    document.getElementById('prv-box2-h').innerText = d.prvBox2H;
+    document.getElementById('prv-box2-p').innerText = d.prvBox2P;
+    document.getElementById('prv-disc-h').innerText = d.prvDiscH;
+    document.getElementById('prv-disc-p').innerText = d.prvDiscP;
+
+    document.getElementById('footer-text').innerText = d.footerText;
+  }
+
+  function openTab(tabName) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    const target = document.getElementById('tab-' + tabName);
+    if (target) target.classList.add('active');
+
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(btn => {
+      if (btn.getAttribute('onclick').includes(tabName)) {
+        btn.classList.add('active');
+      }
+    });
+  }
+</script>
+
+</body>
+</html>

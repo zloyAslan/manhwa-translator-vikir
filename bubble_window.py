@@ -515,12 +515,25 @@ class LanguageSettingsDialog(QDialog):
 
     def open_user_guide(self):
         import webbrowser
+        import sys
         from pathlib import Path
-        guide_file = Path(__file__).parent / "user_guide.html"
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent.resolve()
+        else:
+            base_dir = Path(__file__).parent.resolve()
+
+        # Check guide in app dir or exe dir
+        guide_file = base_dir / "user_guide.html"
+        if not guide_file.exists():
+            guide_file = Path(__file__).parent / "user_guide.html"
+        if not guide_file.exists():
+            guide_file = base_dir / "ai_sound_anki_guide.html"
+
         if guide_file.exists():
             webbrowser.open(guide_file.as_uri())
         else:
-            webbrowser.open("https://github.com")
+            webbrowser.open("https://t.me/lm_reader")
+
 
     def on_swap(self):
         cur_src = self.src_combo.currentData()
@@ -1119,6 +1132,15 @@ class BubbleWindow(QWidget):
 
         self.status_lbl.setText(tr("translating_status", ul, query=query))
         self.status_lbl.show()
+
+        # Terminate any existing lookup thread safely to prevent race conditions
+        if self.active_lookup_thread and self.active_lookup_thread.isRunning():
+            try:
+                self.active_lookup_thread.result_ready.disconnect()
+            except Exception:
+                pass
+            self.active_lookup_thread.terminate()
+            self.active_lookup_thread.wait(200)
 
         self.active_lookup_thread = LookupThread(
             self.dict_service,

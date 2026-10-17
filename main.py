@@ -355,6 +355,23 @@ class ManhwaTranslatorApp:
         except Exception:
             pass
 
+        # Cleanup background threads of child components
+        if hasattr(self, "bubble_window") and hasattr(self.bubble_window, "active_lookup_thread"):
+            if self.bubble_window.active_lookup_thread and self.bubble_window.active_lookup_thread.isRunning():
+                try:
+                    self.bubble_window.active_lookup_thread.terminate()
+                    self.bubble_window.active_lookup_thread.wait(150)
+                except Exception:
+                    pass
+
+        if hasattr(self, "ai_window") and hasattr(self.ai_window, "active_worker"):
+            if self.ai_window.active_worker and self.ai_window.active_worker.isRunning():
+                try:
+                    self.ai_window.active_worker.terminate()
+                    self.ai_window.active_worker.wait(150)
+                except Exception:
+                    pass
+
         if getattr(self, "in_suite", False):
             # If running inside suite, closing translator should NOT close the reader!
             self.mascot.hide()
@@ -365,6 +382,7 @@ class ManhwaTranslatorApp:
             self.tray.hide()
         else:
             self.app.quit()
+
 
     def run(self):
         return self.app.exec()

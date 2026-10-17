@@ -605,6 +605,16 @@ class AIChatWindow(QWidget):
             self.typing_lbl.show()
             self.send_btn.setEnabled(False)
 
+            if self.active_worker and self.active_worker.isRunning():
+                try:
+                    self.active_worker.analysis_ready.disconnect()
+                    self.active_worker.followup_ready.disconnect()
+                    self.active_worker.error_occurred.disconnect()
+                except Exception:
+                    pass
+                self.active_worker.terminate()
+                self.active_worker.wait(200)
+
             self.active_worker = AIWorker(self.ai_service, "analyze", text)
             self.active_worker.analysis_ready.connect(self.on_analysis_received)
             self.active_worker.error_occurred.connect(self.on_ai_error)
@@ -616,6 +626,16 @@ class AIChatWindow(QWidget):
 
             self.typing_lbl.show()
             self.send_btn.setEnabled(False)
+
+            if self.active_worker and self.active_worker.isRunning():
+                try:
+                    self.active_worker.analysis_ready.disconnect()
+                    self.active_worker.followup_ready.disconnect()
+                    self.active_worker.error_occurred.disconnect()
+                except Exception:
+                    pass
+                self.active_worker.terminate()
+                self.active_worker.wait(200)
 
             self.active_worker = AIWorker(
                 self.ai_service, "followup",
@@ -780,3 +800,15 @@ class AIChatWindow(QWidget):
             self.hide()
         else:
             super().keyPressEvent(event)
+
+    def closeEvent(self, event):
+        if self.active_worker and self.active_worker.isRunning():
+            try:
+                self.active_worker.analysis_ready.disconnect()
+                self.active_worker.followup_ready.disconnect()
+                self.active_worker.error_occurred.disconnect()
+            except Exception:
+                pass
+            self.active_worker.terminate()
+            self.active_worker.wait(200)
+        super().closeEvent(event)
