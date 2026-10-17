@@ -1,0 +1,402 @@
+"""
+AI Sound Analyzer for Manhwa & Novel Reader (Dark Fantasy Edition).
+Analyzes complete chapter PDFs using Google Gemini Vision API to generate
+precise atmospheric and sound effect cues broken down by page and vertical fractions (0.0, 0.25, 0.5, 0.75).
+
+Features:
+- 100% Chapter-level caching: saves sound_timeline.json right inside the chapter folder.
+- Native full PDF upload (no manual page slicing needed).
+- Compact JSON payload to ensure lightning-fast responses (~2-4 seconds) and minimal token usage.
+- Extensive, structured vocabulary pool for Ambients (m), Sound Effects (s), and Character Tones (c).
+"""
+
+import os
+import sys
+import json
+import base64
+import logging
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+import requests
+
+logger = logging.getLogger("ai_sound_analyzer")
+
+MOOD_POOL_DEFAULT = [
+    "cave", "dungeon", "forest", "rain", "storm", "city", "tavern",
+    "ruins", "library", "battlefield", "snow_mountain", "ocean_beach",
+    "palace", "airplane_flight", "mystic_sanctuary", "silence"
+]
+
+SFX_POOL_DEFAULT = [
+    "horse_whinny", "sword_clash", "heavy_strike", "magic_cast", "footsteps",
+    "door_creak", "monster_roar", "body_fall", "gasp_shock", "laughter",
+    "heartbeat", "rain_splash", "wind_gust", "page_turn", "explosion", "none"
+]
+
+TONE_POOL = [
+    "epic", "grim", "tense", "peaceful", "humorous", "romantic", "melancholy"
+]
+
+TIMELINE_FILENAME = "sound_timeline.json"
+
+
+def scan_layered_sound_pools(sounds_dir: Path) -> tuple[list[str], list[str], list[str]]:
+    """
+    Categorizes available audio tracks into 3 distinct layers for AI sound design:
+    1. bg_pool: Long melodic background music/score (from ui/ and musical ambients)
+    2. amb_pool: Environmental atmosphere (fireplace, rain, wind, crowd, tavern, cave, forest)
+    3. sfx_pool: Immediate sound effects and physical action loops (swords, hits, run, gallop, scream)
+    """
+    import re
+    amb_dir = sounds_dir / "ambient"
+    ui_dir = sounds_dir / "ui"
+    my_dir = sounds_dir / "my_sounds"
+    sfx_dir = sounds_dir / "sfx"
+
+    bg_candidates = set([
+        "legendary-kingdom-music-rising-empire", "fantasy-ambient", "magic_fantasy",
+        "ancient_celtic_music", "nto-the-darkness-cello-version-long",
+        "by-the-rafters-glow-full-version-medieval-tavern-music-rpg-game",
+        "desert_in_bloom", "magical-forest-instrumental-flute-strings-melody",
+        "silence"
+    ])
+    amb_candidates = set([
+        "cave", "dungeon", "forest", "rain", "storm", "tavern",
+        "crowd", "fireplace", "military_camp", "snow_mountain", "ocean_beach",
+        "village", "barrack", "turkish_bazar", "birds_voices", "crows", "gull",
+        "movements_in_forest", "war_drums", "silence"
+    ])
+    sfx_candidates = set([
+        "sword_clash", "heavy_strike", "magic_cast", "gallop", "run",
+        "monster_roar", "male_laugh", "meme_laugh", "scream", "heartbeat",
+        "page_turn", "neighing", "crows", "guns_battle", "none"
+    ])
+
+    # Scan installed files dynamically
+    for directory in [amb_dir, ui_dir, my_dir]:
+        if directory.exists():
+            for item in directory.iterdir():
+                if item.is_file() and item.suffix.lower() in [".mp3", ".ogg", ".wav"]:
+                    base = re.sub(r'_\d+$', '', item.stem).strip().lower()
+                    if base and not base.startswith("test_sound"):
+                        # If file is in ui or has melodic indicators, place in bg
+                        if directory == ui_dir or any(k in base for k in ["music", "empire", "melody", "flute", "theme", "bloom", "celtic", "cello", "glow", "rafter"]):
+                            bg_candidates.add(base)
+                        else:
+                            amb_candidates.add(base)
+
+    if sfx_dir.exists():
+        for item in sfx_dir.iterdir():
+            if item.is_file() and item.suffix.lower() in [".mp3", ".ogg", ".wav"]:
+                base = re.sub(r'_\d+$', '', item.stem).strip().lower()
+                if base:
+                    sfx_candidates.add(base)
+
+    return sorted(list(bg_candidates)), sorted(list(amb_candidates)), sorted(list(sfx_candidates))
+
+
+def scan_available_sound_pools(sounds_dir: Path) -> tuple[list[str], list[str]]:
+    """Legacy compatibility helper."""
+    bg, amb, sfx = scan_layered_sound_pools(sounds_dir)
+    return sorted(list(set(bg + amb))), sfx
+
+
+class AISoundAnalyzer:
+    """
+    Coordinates PDF analysis and timeline generation via Gemini API.
+    """
+    def __init__(self, api_key: str = "", model_name: str = "gemini-3.5-flash-lite", sounds_dir: Optional[Path] = None):
+        self.api_key = api_key.strip()
+        self.model_name = model_name
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+        base_dir = Path(__file__).parent.parent.resolve()  # manhwa_reader folder
+        self.sounds_dir = sounds_dir or (base_dir / "sounds")
+
+    def set_api_key(self, api_key: str):
+        self.api_key = api_key.strip()
+
+    def get_or_analyze_chapter(
+        self,
+        chapter_dir: Path,
+        pdf_path: Optional[Path] = None,
+        force_reanalyze: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves cached timeline from chapter folder if available.
+        Otherwise, reads chapter PDF, analyzes with Gemini, and saves to cache.
+        Strictly targets chapter_dir (e.g. library/Title/chapter_001/).
+        """
+        chapter_dir = Path(chapter_dir)
+        cache_file = chapter_dir / TIMELINE_FILENAME
+
+        # 1. Fast Cache Hit
+        if not force_reanalyze and cache_file.exists():
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list) and len(data) > 0:
+                        logger.info(f"Loaded cached sound timeline from {cache_file.name} ({len(data)} cues)")
+                        return data
+            except Exception as e:
+                logger.warning(f"Failed to read cache file {cache_file}: {e}")
+
+        # 2. Locate PDF inside chapter_dir or alongside
+        target_pdf = pdf_path
+        if not target_pdf or not target_pdf.exists():
+            pdfs = list(chapter_dir.glob("*.pdf"))
+            if pdfs:
+                target_pdf = pdfs[0]
+
+        # Check if parent has matching chapter PDF
+        if not target_pdf or not target_pdf.exists():
+            from manhwa_reader.downloader import extract_chapter_number
+            target_ch_num = extract_chapter_number(chapter_dir.name)
+            for p in chapter_dir.parent.glob("*.pdf"):
+                if extract_chapter_number(p.stem) == target_ch_num:
+                    target_pdf = p
+                    break
+
+        if not target_pdf or not target_pdf.exists():
+            logger.info(f"No PDF found for {chapter_dir}. Generating default ambient timeline.")
+            default_timeline = self._generate_default_timeline()
+            self._save_cache(cache_file, default_timeline)
+            return default_timeline
+
+        # 3. Check API Key
+        if not self.api_key:
+            logger.warning("Gemini API Key is not set. Generating default ambient timeline.")
+            default_timeline = self._generate_default_timeline()
+            self._save_cache(cache_file, default_timeline)
+            return default_timeline
+
+        # 4. Perform AI Analysis
+        try:
+            timeline = self._analyze_pdf_with_gemini(target_pdf)
+            if timeline:
+                self._save_cache(cache_file, timeline)
+                return timeline
+        except Exception as e:
+            logger.error(f"AI Sound Analysis failed: {e}")
+
+        default_timeline = self._generate_default_timeline()
+        self._save_cache(cache_file, default_timeline)
+        return default_timeline
+
+    def _analyze_pdf_with_gemini(self, pdf_path: Path) -> List[Dict[str, Any]]:
+        """
+        Uploads chapter PDF using Google Files API (reliable, fast, no base64 size limits)
+        and sends structured prompt to gemini-3.1-flash-lite.
+        """
+        file_size = pdf_path.stat().st_size
+        logger.info(f"Uploading PDF {pdf_path.name} ({file_size / (1024*1024):.1f} MB) via Google Files API...")
+
+        upload_url = f"https://generativelanguage.googleapis.com/upload/v1beta/files?key={self.api_key}"
+        upload_headers = {
+            "X-Goog-Upload-Command": "start, upload, finalize",
+            "X-Goog-Upload-Header-Content-Length": str(file_size),
+            "X-Goog-Upload-Header-Content-Type": "application/pdf",
+            "Content-Type": "application/pdf"
+        }
+
+        with open(pdf_path, "rb") as f:
+            pdf_data = f.read()
+
+        up_resp = requests.post(upload_url, headers=upload_headers, data=pdf_data, timeout=90)
+        if up_resp.status_code != 200:
+            raise RuntimeError(f"Files API upload failed ({up_resp.status_code}): {up_resp.text[:300]}")
+
+        file_info = up_resp.json().get("file", {})
+        file_uri = file_info.get("uri")
+        if not file_uri:
+            raise RuntimeError("Files API returned no file URI.")
+
+        # Scan distinct 3-layer pools
+        bg_pool, amb_pool, sfx_pool = scan_layered_sound_pools(self.sounds_dir)
+
+        prompt = f"""
+You are an award-winning anime and webtoon sound director, Foley master, and musical composer.
+Analyze this entire manhwa chapter PDF and compose a rich, multi-layered cinematic soundscape.
+
+CRITICAL ARCHITECTURE: 3 SIMULTANEOUS SOUND LAYERS
+A great soundtrack is a blend of 3 distinct elements playing together in harmony:
+
+1. LAYER 1: "bg" (Background Score / Music):
+   - Sets the macro emotional theme and spans several pages without stopping.
+   - Kept subtle so reading is comfortable: "bg_vol" usually 0.20 to 0.40.
+   - Available tracks: {json.dumps(bg_pool)}
+   - USAGE GUIDELINES:
+     * Grand royal banquet / noble ballroom / aristocratic assembly -> "legendary-kingdom-music-rising-empire" (vol: 0.35-0.45).
+     * Noble estate interior, study room, magic training, or mystery -> "magic_fantasy" or "fantasy-ambient" (vol: 0.25-0.35).
+     * Beautiful princess portraits, blooming gardens, flowers, gentle romantic or poignant dialogues -> "desert_in_bloom", "magical-forest-instrumental-flute-strings-melody", or "ancient_celtic_music" (vol: 0.25-0.35).
+     * Underground dungeon, grim dungeon descent, or lethal monster encounter -> "nto-the-darkness-cello-version-long" (vol: 0.30-0.40).
+     * Lively medieval tavern / celebration -> "by-the-rafters-glow-full-version-medieval-tavern-music-rpg-game" (vol: 0.35-0.45).
+     * High suspense or eerie silence -> "silence".
+
+2. LAYER 2: "amb" (Scene Environmental Acoustic):
+   - Physical acoustic space where the characters are physically located, layered right on top of the music.
+   - Kept balanced: "amb_vol" usually 0.35 to 0.60.
+   - Available ambients: {json.dumps(amb_pool)}
+   - USAGE GUIDELINES:
+     * CAVE / UNDERGROUND / MONSTER LAIR: When characters enter a cave or face monsters underground -> use "cave" or "dungeon" (vol: 0.50-0.65).
+     * Study room or resting by a hearth -> "fireplace" (vol: 0.50).
+     * Ballroom or lively assembly -> "crowd" (vol: 0.40-0.50).
+     * Nature / woods / forest -> "forest" or "movements_in_forest" (vol: 0.40-0.55).
+     * Outdoor trees or serene garden -> "birds_voices" (vol: 0.40).
+     * Military mobilization / army camp -> "military_camp" or "barrack" (vol: 0.45).
+     * Ominous atmosphere / ruins / crows circling -> "crows" (vol: 0.45).
+     * Heavy rain / thunder -> "rain" or "storm" (vol: 0.50-0.65).
+     * If entering a soundproof room or when ambiance should stop -> "none" or "silence".
+
+3. LAYER 3: "sfx" (Dynamic Action, Monster Events & Foley Accents):
+   - Immediate actions and visual beats that occur on specific panels or quarter-pages.
+   - "sfx_vol": 0.40 to 0.85 (delicate cues like subtle smirks or whispers at 0.40-0.50, heavy strikes at 0.85).
+   - "sfx_mode":
+     * "one_shot": plays once on impact.
+       Available: "monster_roar", "sword_clash", "heavy_strike", "magic_cast", "male_laugh", "scream", "heartbeat", "guns_battle", "page_turn", "neighing".
+     * "loop_until_next": sustained continuous actions (e.g. "gallop", "run", "war_drums").
+   - HOW TO SUSTAIN OR CANCEL CONTINUOUS ACTION:
+     * If a horse is galloping through 2-3 fractions: keep "sfx": "gallop" and "sfx_mode": "loop_until_next".
+     * When the rider attacks or dismounts: emit "sword_clash" ("one_shot") or "war_drums", or set "sfx": "none". The gallop will automatically stop!
+     * NEVER let gallop or running keep playing when the horse or action has ended!
+
+SPECIFIC VISUAL & SCENE RULES:
+- MONSTERS & DRAGONS: When monsters, gargoyles, or dragons appear (e.g. red flying monsters, dark beasts in caves) -> use "amb": "cave", "bg": "nto-the-darkness-cello-version-long", and trigger "sfx": "monster_roar" or "heartbeat"!
+- DREAD & SHOCK: When a character is frozen in fear, terrified, or sensing sudden danger -> trigger "sfx": "heartbeat" (vol: 0.60-0.75).
+- CHARACTER EXPRESSIONS & VILLAIN SMIRKS: When a character has a cunning smirk, dark smile, or smug grin -> trigger "sfx": "male_laugh" (vol: 0.50).
+- NO MODERN SOUNDS: NEVER use "city" or car traffic in a medieval fantasy manhwa!
+
+OUTPUT FORMAT:
+Output ONLY a valid JSON array of objects without Markdown formatting or markdown backticks:
+[
+  {{
+    "p": 1,
+    "f": 0,
+    "bg": "nto-the-darkness-cello-version-long",
+    "bg_vol": 0.35,
+    "amb": "cave",
+    "amb_vol": 0.55,
+    "sfx": "none",
+    "sfx_vol": 0.0,
+    "sfx_mode": "one_shot",
+    "d": "entering dark glowing cave with monsters"
+  }},
+  {{
+    "p": 2,
+    "f": 2,
+    "bg": "nto-the-darkness-cello-version-long",
+    "bg_vol": 0.35,
+    "amb": "cave",
+    "amb_vol": 0.55,
+    "sfx": "monster_roar",
+    "sfx_vol": 0.85,
+    "sfx_mode": "one_shot",
+    "d": "flying red dragon monsters screeching"
+  }},
+  {{
+    "p": 5,
+    "f": 1,
+    "bg": "magical-forest-instrumental-flute-strings-melody",
+    "bg_vol": 0.30,
+    "amb": "birds_voices",
+    "amb_vol": 0.40,
+    "sfx": "none",
+    "sfx_vol": 0.0,
+    "sfx_mode": "one_shot",
+    "d": "princess portrait in blooming garden"
+  }},
+  {{
+    "p": 12,
+    "f": 0,
+    "bg": "fantasy-ambient",
+    "bg_vol": 0.30,
+    "amb": "fireplace",
+    "amb_vol": 0.50,
+    "sfx": "none",
+    "sfx_vol": 0.0,
+    "sfx_mode": "one_shot",
+    "d": "warm study conversation"
+  }},
+  {{
+    "p": 16,
+    "f": 2,
+    "bg": "legendary-kingdom-music-rising-empire",
+    "bg_vol": 0.40,
+    "amb": "crowd",
+    "amb_vol": 0.45,
+    "sfx": "none",
+    "sfx_vol": 0.0,
+    "sfx_mode": "one_shot",
+    "d": "grand ballroom reception"
+  }}
+]
+"""
+        url = f"{self.base_url}/{self.model_name}:generateContent?key={self.api_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "fileData": {
+                                "mimeType": "application/pdf",
+                                "fileUri": file_uri
+                            }
+                        },
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 8192,
+                "responseMimeType": "application/json"
+            }
+        }
+
+        resp = requests.post(url, json=payload, headers=headers, timeout=120)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Gemini API returned status {resp.status_code}: {resp.text[:300]}")
+
+        data = resp.json()
+        candidates = data.get("candidates", [])
+        if not candidates:
+            raise RuntimeError("Gemini returned no candidates.")
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            raise RuntimeError("Gemini returned empty parts.")
+
+        text_content = parts[0].get("text", "").strip()
+
+        # Parse JSON with fallback repair if truncated
+        try:
+            parsed = json.loads(text_content)
+        except Exception:
+            # If slightly truncated, trim to last complete object
+            last_bracket = text_content.rfind("}")
+            if last_bracket != -1:
+                repaired = text_content[:last_bracket + 1] + "]"
+                parsed = json.loads(repaired)
+            else:
+                raise
+
+        if isinstance(parsed, list):
+            parsed.sort(key=lambda x: (x.get("p", 1), x.get("f", 0)))
+            return parsed
+        return []
+
+    def _generate_default_timeline(self) -> List[Dict[str, Any]]:
+        """Fallback timeline when API key or PDF is unavailable."""
+        return [
+            {"p": 1, "f": 0, "m": "dungeon", "s": "none", "c": "peaceful", "d": "initial ambient"}
+        ]
+
+    def _save_cache(self, cache_file: Path, timeline: List[Dict[str, Any]]):
+        try:
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(timeline, f, indent=2, ensure_ascii=False)
+            logger.info(f"Saved {len(timeline)} sound cues to {cache_file.name}")
+        except Exception as e:
+            logger.error(f"Failed to write sound cache {cache_file}: {e}")

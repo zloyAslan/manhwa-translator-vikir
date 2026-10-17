@@ -84,6 +84,21 @@ except ImportError:
         except Exception:
             NovelReaderWindow = None
 
+try:
+    from manhwa_reader.sound_system import SoundEngine, AISoundAnalyzer, SoundStudioWindow
+except ImportError:
+    try:
+        from sound_system import SoundEngine, AISoundAnalyzer, SoundStudioWindow
+    except ImportError:
+        try:
+            from manhwa_reader.sound_engine import SoundEngine
+            from manhwa_reader.ai_sound_analyzer import AISoundAnalyzer
+            SoundStudioWindow = None
+        except ImportError:
+            SoundEngine = None
+            AISoundAnalyzer = None
+            SoundStudioWindow = None
+
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent.resolve()
 else:
@@ -108,8 +123,8 @@ TRANSLATIONS = {
         "subtitle": "Standalone webtoon player, auto-bookmarks & high-speed Telegram downloader",
         "fs_on": "⛶ Fullscreen (F11)",
         "fs_off": "🗗 Windowed (F11)",
-        "hide_menu": "👁 Hide Toolbar (H)",
-        "show_menu": "👁 Show Toolbar (H)",
+        "hide_menu": "Hide Menu (H)",
+        "show_menu": "Show Menu (H)",
         "to_catalog": "← Library",
         "lib_title": "Your Library",
         "refresh": "🔄 Refresh",
@@ -147,6 +162,8 @@ TRANSLATIONS = {
         "lang_lbl": "Interface Language:",
         "speed_lbl": "Keyboard Scroll Speed:",
         "lib_lbl": "Library Folder:",
+        "browse_btn": "Browse...",
+        "select_lib_folder": "Select Library Folder",
         "save_btn": "💾 Save Settings",
         "saved_msg": "Settings saved successfully!",
         "auth_btn": "🤖 Bot Token",
@@ -159,8 +176,8 @@ TRANSLATIONS = {
         "cat_tab_novels": "📖 Novels / Light Novels",
         "toggle_del_pdf_title": "Delete Original PDF After Extraction",
         "toggle_del_pdf_sub": "Saves disk space after creating JPEG galleries",
-        "read_in_jpeg": "🖼️ Read in JPEG",
-        "read_in_pdf": "📑 Read in PDF",
+        "read_in_jpeg": "Read in JPEG",
+        "read_in_pdf": "Read in PDF",
         "manual_unpack_title": "📦 Manual Chapter Unpack (PDF → JPEG)",
         "manual_unpack_sub": "Select manhwa and chapter from existing PDFs to convert into JPEG:",
         "manual_unpack_m_lbl": "Manhwa:",
@@ -246,7 +263,8 @@ TRANSLATIONS = {
         "filter_lang_all": "All Languages",
         "filter_lang_ua": "🇺🇦 UA",
         "filter_lang_en": "🇬🇧 EN",
-        "filter_lang_raw": "🌐 RAW",
+        "filter_lang_ru": "🇷🇺 RU",
+        "filter_lang_raw": "🌐 RAW / Other",
         "filter_prog_all": "All Progress",
         "filter_prog_reading": "📖 Reading",
         "filter_prog_completed": "✅ Read",
@@ -257,7 +275,34 @@ TRANSLATIONS = {
         "translate_not_found_msg": "You do not have the Translate module installed. Visit our official Telegram channel to download the full version of the application.",
         "telegram_open_btn": "✈️ Open Telegram Channel",
         "other_translations_avail": "🌐 Available translations:",
-        "switch_trans_tip": "Switch to {lang} version: {title}"
+        "switch_trans_tip": "Switch to {lang} version: {title}",
+        "music_card_title": "🎵 Background Ambient & Effects (Beta 🛠️🚧)",
+        "music_card_sub": "Atmospheric sound design tailored for webtoon and novel immersion:",
+        "music_enable_lbl": "Enable Ambient Atmosphere:",
+        "music_preset_lbl": "Atmospheric Preset:",
+        "music_vol_lbl": "Music & Effects Volume:",
+        "music_preset_dungeon": "⚔️ Dark Dungeon & Caverns",
+        "music_preset_rain": "🌧️ Night Rain & Soft Wind",
+        "music_preset_library": "📚 Ancient Archives (Paper & Quill)",
+        "music_preset_cyber": "🌆 Cyberpunk / Modern Fantasy",
+        "music_beta_notice": "🛠️ Sound engine is currently in Beta test mode. Presets and AI-adaptive soundtrack are being calibrated.",
+        "gemini_key_lbl": "Google Gemini API Key:",
+        "gemini_key_ph": "Enter Gemini API Key...",
+        "show_key_tip": "Show / Hide Key",
+        "gemini_status_configured": "🟢 Gemini API Key configured",
+        "gemini_status_none": "⚪ Key not set (default ambients will be used)",
+        "preload_section_title": "Chapter Preload & Endless Scroll",
+        "preload_mode_lbl": "Next Chapter Preload Mode:",
+        "preload_adaptive": "Adaptive",
+        "preload_manual": "Fixed Percentage",
+        "preload_disabled": "Disabled",
+        "preload_threshold_lbl": "Trigger Preload at Chapter %:",
+        "progress_display_lbl": "Library Progress Display:",
+        "progress_mode_chapter": "Current Chapter Percentage",
+        "progress_mode_overall": "Total Title Percentage",
+        "music_preset_ai_adaptive": "AI-Adaptive Soundtrack",
+        "music_preset_my_sounds": "[My Tracks] {name}",
+        "music_preset_ui": "[Soundtrack] {name}"
     },
     "uk": {
         "app_title": "Manhwa Reader AI Drafter",
@@ -269,8 +314,8 @@ TRANSLATIONS = {
         "subtitle": "Автономний вебтун-плеєр, автозакладки та швидкий завантажувач із Telegram",
         "fs_on": "⛶ На весь екран (F11)",
         "fs_off": "🗗 Згорнути (F11)",
-        "hide_menu": "👁 Приховати меню (H)",
-        "show_menu": "👁 Показати меню (H)",
+        "hide_menu": "Приховати меню (H)",
+        "show_menu": "Показати меню (H)",
         "to_catalog": "← Бібліотека",
         "lib_title": "Твоя бібліотека",
         "refresh": "🔄 Оновити",
@@ -308,6 +353,8 @@ TRANSLATIONS = {
         "lang_lbl": "Мова інтерфейсу:",
         "speed_lbl": "Швидкість скролу клавішами:",
         "lib_lbl": "Папка бібліотеки:",
+        "browse_btn": "Огляд...",
+        "select_lib_folder": "Виберіть папку бібліотеки",
         "save_btn": "💾 Зберегти налаштування",
         "saved_msg": "Налаштування успішно збережено!",
         "auth_btn": "🤖 Токен Бота",
@@ -320,8 +367,8 @@ TRANSLATIONS = {
         "cat_tab_novels": "📖 Новели / Ранобе",
         "toggle_del_pdf_title": "Видаляти оригінальний PDF після розпаковки",
         "toggle_del_pdf_sub": "Економить місце на диску після створення JPEG-галереї",
-        "read_in_jpeg": "🖼️ Читати в JPEG",
-        "read_in_pdf": "📑 Читати в PDF",
+        "read_in_jpeg": "Читати в JPEG",
+        "read_in_pdf": "Читати в PDF",
         "manual_unpack_title": "📦 Ручне розпакування глав (PDF → JPEG)",
         "manual_unpack_sub": "Оберіть манхву та главу з наявних PDF для конвертації в JPEG:",
         "manual_unpack_m_lbl": "Манхва:",
@@ -407,7 +454,8 @@ TRANSLATIONS = {
         "filter_lang_all": "Всі мови",
         "filter_lang_ua": "🇺🇦 UA",
         "filter_lang_en": "🇬🇧 EN",
-        "filter_lang_raw": "🌐 RAW",
+        "filter_lang_ru": "🇷🇺 RU",
+        "filter_lang_raw": "🌐 RAW / Інші",
         "filter_prog_all": "Весь прогрес",
         "filter_prog_reading": "📖 Читаю",
         "filter_prog_completed": "✅ Прочитано",
@@ -418,7 +466,34 @@ TRANSLATIONS = {
         "translate_not_found_msg": "У вас немає встановленого модуля Translate. Перейдіть до нашого офіційного Telegram-каналу, щоб завантажити повноцінну версію додатку.",
         "telegram_open_btn": "✈️ Відкрити Telegram-канал",
         "other_translations_avail": "🌐 Доступні інші переклади:",
-        "switch_trans_tip": "Перейти до {lang} версії: {title}"
+        "switch_trans_tip": "Перейти до {lang} версії: {title}",
+        "music_card_title": "🎵 Фонова музика та атмосфера (Бета 🛠️🚧)",
+        "music_card_sub": "Атмосферний звуковий ембієнт для повного занурення в манхву та новели:",
+        "music_enable_lbl": "Увімкнути фоновий ембієнт:",
+        "music_preset_lbl": "Атмосферний пресет:",
+        "music_vol_lbl": "Гучність музики та ефектів:",
+        "music_preset_dungeon": "⚔️ Темне підземелля та печери",
+        "music_preset_rain": "🌧️ Нічний дощ та легкий вітерець",
+        "music_preset_library": "📚 Стародавній архів (Шелест сторінок)",
+        "music_preset_cyber": "🌆 Кіберпанк / Сучасне фентезі",
+        "music_beta_notice": "🛠️ Звуковий рушій наразі у режимі бета-тестування. Пресети та ШІ-адаптивний саундтрек проходять калібрування.",
+        "gemini_key_lbl": "Ключ Google Gemini API:",
+        "gemini_key_ph": "Введіть Gemini API Key...",
+        "show_key_tip": "Показати / приховати ключ",
+        "gemini_status_configured": "🟢 Gemini API Key налаштовано",
+        "gemini_status_none": "⚪ Ключ не вказано (буде використано базові звуки)",
+        "preload_section_title": "Підвантаження глав та безкінечний скрол",
+        "preload_mode_lbl": "Режим підвантаження наступної глави:",
+        "preload_adaptive": "Адаптивно",
+        "preload_manual": "Фіксований відсоток",
+        "preload_disabled": "Вимкнено",
+        "preload_threshold_lbl": "Поріг підвантаження глави (%):",
+        "progress_display_lbl": "Відображення прогресу в бібліотеці:",
+        "progress_mode_chapter": "Відсоток поточної глави",
+        "progress_mode_overall": "Загальний відсоток від усього тайтлу",
+        "music_preset_ai_adaptive": "ШІ-Адаптивний Саундтрек",
+        "music_preset_my_sounds": "[Мої треки] {name}",
+        "music_preset_ui": "[Саундтрек] {name}"
     },
     "ru": {
         "app_title": "Manhwa Reader AI Drafter",
@@ -430,8 +505,8 @@ TRANSLATIONS = {
         "subtitle": "Автономный вебтун-плеер, автозакладки и быстрый загрузчик из Telegram",
         "fs_on": "⛶ На весь экран (F11)",
         "fs_off": "🗗 Свернуть (F11)",
-        "hide_menu": "👁 Скрыть меню (H)",
-        "show_menu": "👁 Показать меню (H)",
+        "hide_menu": "Скрыть меню (H)",
+        "show_menu": "Показать меню (H)",
         "to_catalog": "← Библиотека",
         "lib_title": "Твоя библиотека",
         "refresh": "🔄 Обновить",
@@ -469,6 +544,8 @@ TRANSLATIONS = {
         "lang_lbl": "Язык интерфейса:",
         "speed_lbl": "Скорость скролла клавишами:",
         "lib_lbl": "Папка библиотеки:",
+        "browse_btn": "Обзор...",
+        "select_lib_folder": "Выберите папку библиотеки",
         "save_btn": "💾 Сохранить настройки",
         "saved_msg": "Настройки успешно сохранены!",
         "auth_btn": "🤖 Токен Бота",
@@ -481,8 +558,8 @@ TRANSLATIONS = {
         "cat_tab_novels": "📖 Новеллы / Ранобэ",
         "toggle_del_pdf_title": "Удалять исходный PDF после распаковки",
         "toggle_del_pdf_sub": "Экономит место на диске после создания галереи JPEG",
-        "read_in_jpeg": "🖼️ Читать в JPEG",
-        "read_in_pdf": "📑 Читать в PDF",
+        "read_in_jpeg": "Читать в JPEG",
+        "read_in_pdf": "Читать в PDF",
         "manual_unpack_title": "📦 Ручная распаковка глав (PDF → JPEG)",
         "manual_unpack_sub": "Выберите манхву и главу из доступных PDF для конвертации в JPEG:",
         "manual_unpack_m_lbl": "Манхва:",
@@ -568,7 +645,8 @@ TRANSLATIONS = {
         "filter_lang_all": "Все языки",
         "filter_lang_ua": "🇺🇦 UA",
         "filter_lang_en": "🇬🇧 EN",
-        "filter_lang_raw": "🌐 RAW",
+        "filter_lang_ru": "🇷🇺 RU",
+        "filter_lang_raw": "🌐 RAW / Другие",
         "filter_prog_all": "Весь прогресс",
         "filter_prog_reading": "📖 Читаю",
         "filter_prog_completed": "✅ Прочитано",
@@ -579,7 +657,35 @@ TRANSLATIONS = {
         "translate_not_found_msg": "У вас не установлен модуль Translate. Перейдите в наш официальный Telegram-канал, чтобы скачать полную версию приложения.",
         "telegram_open_btn": "✈️ Открыть Telegram-канал",
         "other_translations_avail": "🌐 Доступны другие переводы:",
-        "switch_trans_tip": "Перейти к {lang} версии: {title}"
+        "switch_trans_tip": "Перейти к {lang} версии: {title}",
+        "music_card_title": "🎵 Фоновая музыка и атмосфера (Бета 🛠️🚧)",
+        "music_card_sub": "Атмосферный звуковой эмбиент для полного погружения в манхву и новеллы:",
+        "music_enable_lbl": "Включить фоновый эмбиент:",
+        "music_preset_lbl": "Атмосферный пресет:",
+        "music_vol_lbl": "Громкость музыки и эффектов:",
+        "music_preset_dungeon": "⚔️ Темное подземелье и пещеры",
+        "music_preset_rain": "🌧️ Ночной дождь и легкий ветерок",
+        "music_preset_library": "📚 Древний архив (Шелест страниц)",
+        "music_preset_cyber": "🌆 Киберпанк / Современное фэнтези",
+        "music_beta_notice": "🛠️ Звуковой движок сейчас в режиме бета-тестирования. Пресеты и ИИ-адаптивный саундтрек калибруются.",
+        "gemini_key_lbl": "Ключ Google Gemini API:",
+        "gemini_key_ph": "Введите Gemini API Key...",
+        "show_key_tip": "Показать / скрыть ключ",
+        "clear_key_tip": "Очистить / удалить ключ",
+        "gemini_status_configured": "🟢 Gemini API Key настроен",
+        "gemini_status_none": "⚪ Ключ не указан (будут использоваться базовые звуки)",
+        "preload_section_title": "Предзагрузка глав и бесконечный скролл",
+        "preload_mode_lbl": "Режим предзагрузки следующей главы:",
+        "preload_adaptive": "Адаптивно",
+        "preload_manual": "Фиксированный процент",
+        "preload_disabled": "Отключено",
+        "preload_threshold_lbl": "Порог предзагрузки главы (%):",
+        "progress_display_lbl": "Отображение прогресса в библиотеке:",
+        "progress_mode_chapter": "Процент текущей главы",
+        "progress_mode_overall": "Общий процент от всего тайтла",
+        "music_preset_ai_adaptive": "ИИ-Адаптивный Саундтрек",
+        "music_preset_my_sounds": "[Мои треки] {name}",
+        "music_preset_ui": "[Саундтрек] {name}"
     }
 }
 
@@ -592,6 +698,9 @@ def load_config() -> dict:
         "zoom": 1.0,
         "fullscreen": False,
         "scroll_speed": 75,
+        "preload_mode": "adaptive",
+        "manual_preload_threshold": 75,
+        "progress_display_mode": "chapter",
         "auto_preload_threshold": 0.67,
         "language": "en",
         "delete_pdf_after_extract": True,
@@ -676,6 +785,59 @@ def matches_search_query(query: str, title: str, aliases: Optional[List[str]] = 
     # Or every token in query matches somewhere in candidates
     q_tokens = q_norm.split()
     return all(token in joined_candidates for token in q_tokens)
+
+
+def detect_title_language(title: str, explicit_lang: Optional[str] = None) -> str:
+    """
+    Accurately detects language code (UA, RU, EN, RAW) based on explicit tags,
+    specific language alphabets (Ukrainian specific letters, Cyrillic) and tags.
+    Other languages (including Slovak, Korean, Japanese, Chinese) map to RAW/Other.
+    """
+    if explicit_lang:
+        el = explicit_lang.strip().upper()
+        if el in ["UA", "UK", "UKR"]:
+            return "UA"
+        if el in ["RU", "RUS"]:
+            return "RU"
+        if el in ["EN", "ENG"]:
+            return "EN"
+        if el in ["RAW", "KR", "JP", "CN", "SK", "SLO", "SLOVAK"]:
+            return "RAW"
+
+    t = title.strip()
+    t_up = t.upper()
+
+    # 1. Check explicit bracket tags [UA], [RU], [EN], [RAW]
+    m_tag = re.search(r'\[(UA|UK|UKR|RU|RUS|EN|ENG|RAW|KR|JP|CN|SK|SLO)\]', t_up)
+    if m_tag:
+        code = m_tag.group(1)
+        if code in ["UA", "UK", "UKR"]:
+            return "UA"
+        if code in ["RU", "RUS"]:
+            return "RU"
+        if code in ["EN", "ENG"]:
+            return "EN"
+        if code in ["RAW", "KR", "JP", "CN", "SK", "SLO"]:
+            return "RAW"
+
+    # 2. Check Slovak specific letters -> maps to RAW / Other
+    if re.search(r'[ôďťňľŕĺä]', t, re.I):
+        return "RAW"
+
+    # 3. Check Ukrainian specific letters
+    if re.search(r'[іїєґ]', t, re.I):
+        return "UA"
+
+    # 4. Check Russian specific letters
+    if re.search(r'[ыэъё]', t, re.I):
+        return "RU"
+
+    # 5. General Cyrillic fallback -> RU if general Cyrillic without unique UA letters
+    if re.search(r'[а-я]', t, re.I):
+        return "RU"
+
+    # 6. Default Latin -> EN
+    return "EN"
 
 
 
@@ -2074,55 +2236,84 @@ class ManhwaCard(QFrame):
         bm_text = "New" if self.lang_dict.get("cancel") == "Cancel" else "Нова"
         if self.bookmark_info:
             ch_num = self.bookmark_info.get("chapter", 1)
-            pct = int(self.bookmark_info.get("chapter_progress", 0) * 100)
-            bm_text = f"Ch. {ch_num} ({pct}%)"
+            # Check configured display mode from app config if available
+            disp_mode = "chapter"
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, "cfg"):
+                    disp_mode = p.cfg.get("progress_display_mode", "chapter")
+                    break
+                p = p.parent()
+
+            if disp_mode == "overall" and "overall_pct" in self.bookmark_info:
+                val = float(self.bookmark_info["overall_pct"])
+                bm_text = f"Ch. {ch_num} ({val:.1f}%)"
+            else:
+                raw_pct = self.bookmark_info.get("percent")
+                if raw_pct is None:
+                    prog = self.bookmark_info.get("chapter_progress") or self.bookmark_info.get("scroll_ratio", 0.0)
+                    raw_pct = float(prog) * 100 if float(prog) <= 1.0 else float(prog)
+                bm_text = f"Ch. {ch_num} ({float(raw_pct):.1f}%)"
 
         info_lbl = QLabel(f"📁 {ch_count}  •  🔖 {bm_text}")
         info_lbl.setStyleSheet("font-size: 11px; color: #9ca3af; font-weight: 500;")
         layout.addWidget(info_lbl)
 
-        # Linked Translations Pills (if available)
-        if self.linked_translations:
-            pills_row = QHBoxLayout()
-            pills_row.setContentsMargins(0, 0, 0, 0)
-            pills_row.setSpacing(5)
+        # Language badge & Linked Translations Row
+        pills_row = QHBoxLayout()
+        pills_row.setContentsMargins(0, 0, 0, 0)
+        pills_row.setSpacing(5)
 
-            pills_badge = QLabel("🌐")
-            pills_badge.setStyleSheet("font-size: 11px; color: #94a3b8;")
-            pills_row.addWidget(pills_badge)
+        pills_badge = QLabel("🌐")
+        pills_badge.setStyleSheet("font-size: 11px; color: #94a3b8;")
+        pills_row.addWidget(pills_badge)
 
-            for item in self.linked_translations:
-                l_code = item.get("lang", "").upper()
-                l_target = item.get("target") or item.get("title", "")
-                pill_btn = QPushButton(l_code)
-                pill_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-                tip = self.lang_dict.get("switch_trans_tip", "Перейти до {lang} версії: {title}").format(
-                    lang=l_code, title=item.get("title", l_target)
-                )
-                pill_btn.setToolTip(tip)
-                pill_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(245, 158, 11, 0.15);
-                        color: #fbbf24;
-                        border: 1px solid rgba(245, 158, 11, 0.4);
-                        border-radius: 5px;
-                        padding: 1px 6px;
-                        font-size: 10px;
-                        font-weight: 800;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(245, 158, 11, 0.35);
-                        color: #ffffff;
-                        border-color: #f59e0b;
-                    }
-                """)
-                pill_btn.clicked.connect(lambda _, it=item: self.switch_translation_clicked.emit(it))
-                pills_row.addWidget(pill_btn)
+        card_lang = detect_title_language(self.manhwa_name)
+        my_lang_lbl = QLabel(card_lang)
+        my_lang_lbl.setStyleSheet("""
+            background-color: rgba(245, 158, 11, 0.25);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.6);
+            border-radius: 5px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 800;
+        """)
+        pills_row.addWidget(my_lang_lbl)
 
-            pills_row.addStretch()
-            layout.addLayout(pills_row)
-        else:
-            layout.addSpacing(2)
+        # Show other translations if they are actually DIFFERENT languages
+        for item in self.linked_translations:
+            l_code = item.get("lang", "").upper()
+            if l_code == card_lang:
+                continue
+            l_target = item.get("target") or item.get("title", "")
+            pill_btn = QPushButton(l_code)
+            pill_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            tip = self.lang_dict.get("switch_trans_tip", "Перейти до {lang} версії: {title}").format(
+                lang=l_code, title=item.get("title", l_target)
+            )
+            pill_btn.setToolTip(tip)
+            pill_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(59, 130, 246, 0.15);
+                    color: #60a5fa;
+                    border: 1px solid rgba(59, 130, 246, 0.4);
+                    border-radius: 5px;
+                    padding: 1px 6px;
+                    font-size: 10px;
+                    font-weight: 800;
+                }
+                QPushButton:hover {
+                    background-color: rgba(59, 130, 246, 0.35);
+                    color: #ffffff;
+                    border-color: #3b82f6;
+                }
+            """)
+            pill_btn.clicked.connect(lambda _, it=item: self.switch_translation_clicked.emit(it))
+            pills_row.addWidget(pill_btn)
+
+        pills_row.addStretch()
+        layout.addLayout(pills_row)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
@@ -2308,8 +2499,23 @@ class CloudManhwaCard(QFrame):
         bm_text = self.lang_dict.get("cloud_card_new", "Нова")
         if self.bookmark_info:
             ch_num = self.bookmark_info.get("chapter", 1)
-            pct = int(self.bookmark_info.get("chapter_progress", 0) * 100)
-            bm_text = f"Ch. {ch_num} ({pct}%)"
+            disp_mode = "chapter"
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, "cfg"):
+                    disp_mode = p.cfg.get("progress_display_mode", "chapter")
+                    break
+                p = p.parent()
+
+            if disp_mode == "overall" and "overall_pct" in self.bookmark_info:
+                val = float(self.bookmark_info["overall_pct"])
+                bm_text = f"Ch. {ch_num} ({val:.1f}%)"
+            else:
+                raw_pct = self.bookmark_info.get("percent")
+                if raw_pct is None:
+                    prog = self.bookmark_info.get("chapter_progress") or self.bookmark_info.get("scroll_ratio", 0.0)
+                    raw_pct = float(prog) * 100 if float(prog) <= 1.0 else float(prog)
+                bm_text = f"Ch. {ch_num} ({float(raw_pct):.1f}%)"
 
         info_row = QHBoxLayout()
         info_row.setContentsMargins(0, 0, 0, 0)
@@ -2371,55 +2577,68 @@ class CloudManhwaCard(QFrame):
         actions_row.addWidget(read_btn, stretch=1)
         layout.addLayout(actions_row)
 
-        # Linked Translations Pills (if available)
-        if self.linked_translations:
-            pills_row = QHBoxLayout()
-            pills_row.setContentsMargins(0, 0, 0, 0)
-            pills_row.setSpacing(5)
+        # Language badge & Linked Translations Row
+        pills_row = QHBoxLayout()
+        pills_row.setContentsMargins(0, 0, 0, 0)
+        pills_row.setSpacing(5)
 
-            pills_badge = QLabel("🌐")
-            pills_badge.setStyleSheet("font-size: 11px; color: #94a3b8;")
-            pills_row.addWidget(pills_badge)
+        pills_badge = QLabel("🌐")
+        pills_badge.setStyleSheet("font-size: 11px; color: #94a3b8;")
+        pills_row.addWidget(pills_badge)
 
-            for item in self.linked_translations:
-                l_code = item.get("lang", "").upper()
-                l_target = item.get("target") or item.get("title", "")
-                pill_btn = QPushButton(l_code)
-                pill_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-                tip = self.lang_dict.get("switch_trans_tip", "Перейти до {lang} версії: {title}").format(
-                    lang=l_code, title=item.get("title", l_target)
-                )
-                pill_btn.setToolTip(tip)
-                pill_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(59, 130, 246, 0.18);
-                        color: #60a5fa;
-                        border: 1px solid rgba(59, 130, 246, 0.45);
-                        border-radius: 5px;
-                        padding: 1px 6px;
-                        font-size: 10px;
-                        font-weight: 800;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(59, 130, 246, 0.35);
-                        color: #ffffff;
-                        border-color: #93c5fd;
-                    }
-                """)
-                pill_btn.clicked.connect(lambda _, it=item: self.switch_translation_clicked.emit(it))
-                pills_row.addWidget(pill_btn)
+        card_lang = (self.cloud_entry.get("lang") or detect_title_language(self.full_title)).upper()
+        my_lang_lbl = QLabel(card_lang)
+        my_lang_lbl.setStyleSheet("""
+            background-color: rgba(59, 130, 246, 0.25);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.6);
+            border-radius: 5px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 800;
+        """)
+        pills_row.addWidget(my_lang_lbl)
 
-            pills_row.addStretch()
-            layout.addLayout(pills_row)
-        else:
-            layout.addSpacing(2)
+        for item in self.linked_translations:
+            l_code = item.get("lang", "").upper()
+            if l_code == card_lang:
+                continue
+            l_target = item.get("target") or item.get("title", "")
+            pill_btn = QPushButton(l_code)
+            pill_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            tip = self.lang_dict.get("switch_trans_tip", "Перейти до {lang} версії: {title}").format(
+                lang=l_code, title=item.get("title", l_target)
+            )
+            pill_btn.setToolTip(tip)
+            pill_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(245, 158, 11, 0.15);
+                    color: #fbbf24;
+                    border: 1px solid rgba(245, 158, 11, 0.4);
+                    border-radius: 5px;
+                    padding: 1px 6px;
+                    font-size: 10px;
+                    font-weight: 800;
+                }
+                QPushButton:hover {
+                    background-color: rgba(245, 158, 11, 0.35);
+                    color: #ffffff;
+                    border-color: #f59e0b;
+                }
+            """)
+            pill_btn.clicked.connect(lambda _, it=item: self.switch_translation_clicked.emit(it))
+            pills_row.addWidget(pill_btn)
+
+        pills_row.addStretch()
+        layout.addLayout(pills_row)
 
 
 # ---------------------------------------------------------------------------
 # Seamless Continuous Webtoon Strip
 # ---------------------------------------------------------------------------
 class WebtoonScrollCanvas(QScrollArea):
-    scroll_progress_signal = pyqtSignal(int, float)
+    scroll_progress_signal = pyqtSignal(int, float, float)  # ch_num, chapter_pct, overall_pct
+    chapter_changed_signal = pyqtSignal(int)
     mode_changed_signal = pyqtSignal(str)
 
     def __init__(self, cfg: dict, parent=None):
@@ -2437,6 +2656,10 @@ class WebtoonScrollCanvas(QScrollArea):
         self.page_labels: List[Tuple[int, QLabel, str]] = []
         self.pixmap_cache: Dict[str, QPixmap] = {}
 
+        # Preloaded Audio Timelines cache (ch_num -> timeline cues)
+        self.preloaded_timelines: Dict[int, list] = {}
+        self._preloading_chapters: Set[int] = set()
+
         self.active_ch_num = 1
         self.is_restoring_scroll = False
         self.is_cloud_mode = False
@@ -2447,6 +2670,11 @@ class WebtoonScrollCanvas(QScrollArea):
         self.scale_timer.setSingleShot(True)
         self.scale_timer.setInterval(80)
         self.scale_timer.timeout.connect(self._do_rescale)
+
+        # Lightweight Velocity & Ahead-Cue Predictor (zero disk overhead)
+        self._last_scroll_time = 0.0
+        self._last_scroll_val = 0
+        self._scroll_velocity_px_s = 0.0
 
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -2555,9 +2783,14 @@ class WebtoonScrollCanvas(QScrollArea):
 
     def set_bg_color(self, hex_color: str):
         self.bg_color = hex_color
-        self.setStyleSheet(f"QScrollArea {{ background-color: {self.bg_color}; border: none; }}")
-        self.container.setStyleSheet(f"background-color: {self.bg_color};")
-        self.strip_widget.setStyleSheet(f"background-color: {self.bg_color};")
+        if hex_color == "transparent":
+            self.setStyleSheet("QScrollArea { background-color: transparent; background: transparent; border: none; }")
+            self.container.setStyleSheet("background-color: transparent; background: transparent;")
+            self.strip_widget.setStyleSheet("background-color: transparent; background: transparent;")
+        else:
+            self.setStyleSheet(f"QScrollArea {{ background-color: {self.bg_color}; border: none; }}")
+            self.container.setStyleSheet(f"background-color: {self.bg_color};")
+            self.strip_widget.setStyleSheet(f"background-color: {self.bg_color};")
 
     def get_chapter_resources(self, ch_num: int) -> Tuple[List[Path], Optional[Path]]:
         if not self.current_manhwa_path:
@@ -2594,6 +2827,99 @@ class WebtoonScrollCanvas(QScrollArea):
 
         return imgs, pdf_path
 
+    def _get_parent_app(self):
+        p = self.parent()
+        while p is not None and not hasattr(p, "sound_engine"):
+            p = p.parent()
+        return p
+
+    def _find_chapter_folder(self, ch_num: int) -> Optional[Path]:
+        if not self.current_manhwa_path or not self.current_manhwa_path.exists():
+            return None
+        for cand in self.current_manhwa_path.iterdir():
+            if cand.is_dir() and not cand.name.startswith("."):
+                if extract_chapter_number(cand.name) == ch_num:
+                    return cand
+        return self.current_manhwa_path / f"chapter_{ch_num:03d}"
+
+    def preload_sound_timeline_for_chapter(self, ch_num: int):
+        """Asynchronously preloads or generates sound timeline for next chapter in background."""
+        if ch_num in self.preloaded_timelines or ch_num in self._preloading_chapters:
+            return
+        if not self.current_manhwa_path:
+            return
+        p = self._get_parent_app()
+        if not p or not getattr(p, "sound_engine", None) or not getattr(p.sound_engine, "is_enabled", False):
+            return
+        preset_mode = p.cfg.get("music_preset", "ai_adaptive")
+        if preset_mode != "ai_adaptive" or not getattr(p, "ai_analyzer", None):
+            return
+
+        target_ch_dir = self._find_chapter_folder(ch_num)
+        if not target_ch_dir or not target_ch_dir.exists():
+            return
+
+        self._preloading_chapters.add(ch_num)
+
+        def _worker():
+            try:
+                tl = p.ai_analyzer.get_or_analyze_chapter(target_ch_dir)
+                if tl:
+                    self.preloaded_timelines[ch_num] = tl
+            except Exception as e:
+                logger.debug(f"[WebtoonCanvas] Preload timeline error for ch {ch_num}: {e}")
+            finally:
+                self._preloading_chapters.discard(ch_num)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _switch_sound_timeline_to_chapter(self, ch_num: int):
+        """Seamlessly applies sound timeline for current chapter without freezing."""
+        p = self._get_parent_app()
+        if not p or not getattr(p, "sound_engine", None) or not getattr(p.sound_engine, "is_enabled", False):
+            return
+        preset_mode = p.cfg.get("music_preset", "ai_adaptive")
+        if preset_mode != "ai_adaptive":
+            track_name = preset_mode.split(":", 1)[-1] if ":" in preset_mode else preset_mode
+            p.sound_engine.set_timeline([])
+            p.sound_engine.play_ambient(track_name)
+            p.sound_engine.set_chapter_loading(False)
+            return
+
+        # 1. Use in-RAM preloaded timeline if available
+        if ch_num in self.preloaded_timelines:
+            tl = self.preloaded_timelines[ch_num]
+            p.sound_engine.set_timeline(tl)
+            p.sound_engine.set_chapter_loading(False)
+            return
+
+        target_ch_dir = self._find_chapter_folder(ch_num)
+        if not target_ch_dir or not getattr(p, "ai_analyzer", None):
+            return
+
+        cache_p = target_ch_dir / "sound_timeline.json"
+        if cache_p.exists():
+            tl = p.ai_analyzer.get_or_analyze_chapter(target_ch_dir)
+            self.preloaded_timelines[ch_num] = tl
+            p.sound_engine.set_timeline(tl)
+            p.sound_engine.set_chapter_loading(False)
+        else:
+            p.sound_engine.set_chapter_loading(True)
+
+            def _async_load():
+                try:
+                    tl = p.ai_analyzer.get_or_analyze_chapter(target_ch_dir)
+                    self.preloaded_timelines[ch_num] = tl
+                    QTimer.singleShot(0, lambda: p.sound_engine.set_timeline(tl))
+                except Exception as ex:
+                    logger.error(f"Async timeline error: {ex}")
+                finally:
+                    QTimer.singleShot(150, lambda: p.sound_engine.set_chapter_loading(False))
+
+            import threading
+            threading.Thread(target=_async_load, daemon=True).start()
+
     def load_manhwa_chapter(self, manhwa_path: Path, start_ch_num: int, restore_scroll_y: int = 0, preferred_mode: Optional[str] = None):
         self.current_manhwa_path = manhwa_path
         self.current_manhwa_name = manhwa_path.name
@@ -2615,6 +2941,10 @@ class WebtoonScrollCanvas(QScrollArea):
             self.verticalScrollBar().setValue(0)
             self.is_restoring_scroll = False
 
+        # Activate current sound timeline and pre-generate next chapter timeline!
+        self._switch_sound_timeline_to_chapter(start_ch_num)
+        self.preload_sound_timeline_for_chapter(start_ch_num + 1)
+
     def clear_canvas(self):
         while self.strip_layout.count():
             item = self.strip_layout.takeAt(0)
@@ -2624,6 +2954,8 @@ class WebtoonScrollCanvas(QScrollArea):
         self.loaded_chapters.clear()
         self.chapter_modes.clear()
         self.pixmap_cache.clear()
+        self.preloaded_timelines.clear()
+        self._preloading_chapters.clear()
         if self.rolling_cache:
             self.rolling_cache.clear_all()
 
@@ -2804,16 +3136,142 @@ class WebtoonScrollCanvas(QScrollArea):
         if max_scroll <= 0:
             return
 
-        ratio = value / max_scroll
+        viewport_h = self.viewport().height()
 
+        # -------------------------------------------------------------
+        # 1. Real-time Velocity Tracker with Exponential Smoothing
+        # -------------------------------------------------------------
+        import time
+        now = time.time()
+        dt = now - self._last_scroll_time if self._last_scroll_time > 0 else 0.1
+        dy = abs(value - self._last_scroll_val)
+        self._last_scroll_time = now
+        self._last_scroll_val = value
+
+        inst_velocity = dy / max(0.01, dt)
+        self._scroll_velocity_px_s = 0.7 * self._scroll_velocity_px_s + 0.3 * inst_velocity
+
+        # -------------------------------------------------------------
+        # 2. Identify Visible Chapter, Page in Chapter, and Chapter Geometry
+        # -------------------------------------------------------------
+        # Focus point for reader awareness (roughly 40% into the viewport)
+        focus_y = value + int(viewport_h * 0.40)
+
+        visible_ch_num = self.active_ch_num
+        page_idx_in_ch = 1
+        total_pages_in_ch = 1
+
+        # Track bounds of each chapter in the continuous strip
+        ch_bounds: Dict[int, Dict[str, int]] = {}
+        ch_pages: Dict[int, list] = {}
+
+        accum_y = 0
+        focus_page_found = False
+
+        for idx, item in enumerate(self.page_labels):
+            ch = item[0]
+            lbl = item[1]
+            lh = lbl.height()
+
+            if ch not in ch_bounds:
+                ch_bounds[ch] = {"start_y": accum_y, "height": 0}
+                ch_pages[ch] = []
+            ch_bounds[ch]["height"] += lh
+            ch_pages[ch].append((accum_y, lh))
+
+            if not focus_page_found and (accum_y + lh > focus_y):
+                visible_ch_num = ch
+                page_idx_in_ch = len(ch_pages[ch])
+                focus_page_found = True
+
+            accum_y += lh
+
+        if visible_ch_num in ch_pages:
+            total_pages_in_ch = max(1, len(ch_pages[visible_ch_num]))
+
+        # -------------------------------------------------------------
+        # 3. Handle Chapter Boundary Crossing (Update UI & Sound Timeline)
+        # -------------------------------------------------------------
+        if visible_ch_num != self.active_ch_num:
+            self.active_ch_num = visible_ch_num
+            self.chapter_changed_signal.emit(visible_ch_num)
+            self._switch_sound_timeline_to_chapter(visible_ch_num)
+            # Preload next chapter sound timeline ahead
+            self.preload_sound_timeline_for_chapter(visible_ch_num + 1)
+
+        # -------------------------------------------------------------
+        # 4. Accurate Chapter Percentage & Overall Title Percentage
+        # -------------------------------------------------------------
+        ch_geom = ch_bounds.get(visible_ch_num, {"start_y": 0, "height": max_scroll})
+        ch_start = ch_geom["start_y"]
+        ch_h = max(1, ch_geom["height"])
+
+        ch_eff_scroll = max(0, value - ch_start)
+        ch_eff_max = max(1, ch_h - viewport_h)
+        chapter_pct = min(1.0, max(0.0, ch_eff_scroll / ch_eff_max))
+
+        # Overall percentage across total known chapters
+        p_app = self._get_parent_app()
+        total_chs = 1
+        if p_app and hasattr(p_app, "chapter_combo") and p_app.chapter_combo.count() > 0:
+            total_chs = p_app.chapter_combo.count()
+
+        overall_pct = min(100.0, max(0.0, ((max(0, visible_ch_num - 1) + chapter_pct) / max(1, total_chs)) * 100.0))
+
+        # Emit updated progress signal with BOTH metrics
+        self.scroll_progress_signal.emit(visible_ch_num, chapter_pct, overall_pct)
+
+        # -------------------------------------------------------------
+        # 5. Configurable / Adaptive Next Chapter Preloading
+        # -------------------------------------------------------------
         if self.is_cloud_mode and self.rolling_cache:
-            self.rolling_cache.on_scroll_threshold_reached(self.active_ch_num, ratio)
-        elif ratio >= self.cfg.get("auto_preload_threshold", 0.67):
-            next_ch = self.active_ch_num + 1
-            if next_ch not in self.loaded_chapters:
-                self.append_chapter(next_ch)
+            self.rolling_cache.on_scroll_threshold_reached(visible_ch_num, chapter_pct)
+        else:
+            preload_mode = self.cfg.get("preload_mode", "adaptive")
+            if preload_mode != "disabled":
+                threshold = 0.80  # Default ~4/5 chapter
+                if preload_mode == "manual":
+                    threshold = max(0.01, min(1.0, self.cfg.get("manual_preload_threshold", 75) / 100.0))
+                elif preload_mode == "adaptive":
+                    # If reader scrolls fast, shift preload point earlier so chapter renders in advance!
+                    if self._scroll_velocity_px_s > 200:
+                        speed_lead = min(0.35, (self._scroll_velocity_px_s - 200) / 1500.0)
+                        threshold = max(0.45, 0.80 - speed_lead)
 
-        self.scroll_progress_signal.emit(self.active_ch_num, ratio)
+                if chapter_pct >= threshold:
+                    next_ch = visible_ch_num + 1
+                    if next_ch not in self.loaded_chapters:
+                        self.append_chapter(next_ch)
+                        self.preload_sound_timeline_for_chapter(next_ch)
+                        self.preload_sound_timeline_for_chapter(next_ch + 1)
+
+        # -------------------------------------------------------------
+        # 6. Notify Sound Engine with Local Chapter Page & Lookahead
+        # -------------------------------------------------------------
+        if p_app and getattr(p_app, "sound_engine", None) and getattr(p_app.sound_engine, "is_enabled", False):
+            try:
+                lookahead_px = min(viewport_h * 2.0, self._scroll_velocity_px_s * 0.8) if self._scroll_velocity_px_s > 150 else 0
+                sound_focus_y = value + int(viewport_h * 0.70) + int(lookahead_px)
+
+                sound_page = page_idx_in_ch
+                sound_frac = 0
+                curr_y = 0
+
+                for item in self.page_labels:
+                    if item[0] != visible_ch_num:
+                        curr_y += item[1].height()
+                        continue
+                    lh = item[1].height()
+                    if curr_y + lh > sound_focus_y:
+                        # Found target page within current chapter
+                        offset = max(0, sound_focus_y - curr_y)
+                        sound_frac = min(3, max(0, int((offset / max(1, lh)) * 4)))
+                        break
+                    curr_y += lh
+
+                p_app.sound_engine.on_scroll_position(sound_page, sound_frac)
+            except Exception as e:
+                logger.debug(f"[WebtoonCanvas] Sound cue error: {e}")
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -2861,6 +3319,16 @@ class ManhwaApp(QMainWindow):
         self.filter_progress = "ALL"
         self.stream_client = TelegramStreamClient()
         self.current_cloud_worker: Optional[StreamDownloadThread] = None
+
+        # Sound Engine & AI Atmosphere Analyzer
+        gemini_key = self.cfg.get("gemini_api_key", "")
+        self.ai_analyzer = AISoundAnalyzer(api_key=gemini_key) if AISoundAnalyzer is not None else None
+        if SoundEngine is not None:
+            self.sound_engine = SoundEngine(self)
+            self.sound_engine.set_enabled(self.cfg.get("music_enabled", False))
+            self.sound_engine.set_volume(self.cfg.get("music_volume", 40))
+        else:
+            self.sound_engine = None
 
         self.init_window_properties()
         self.init_ui()
@@ -3171,10 +3639,14 @@ class ManhwaApp(QMainWindow):
         self.filter_lang_combo.addItem(self.t.get("filter_lang_all", "Всі мови"), "ALL")
         self.filter_lang_combo.addItem(self.t.get("filter_lang_ua", "🇺🇦 UA"), "UA")
         self.filter_lang_combo.addItem(self.t.get("filter_lang_en", "🇬🇧 EN"), "EN")
-        self.filter_lang_combo.addItem(self.t.get("filter_lang_raw", "🌐 RAW"), "RAW")
+        self.filter_lang_combo.addItem(self.t.get("filter_lang_ru", "🇷🇺 RU"), "RU")
+        self.filter_lang_combo.addItem(self.t.get("filter_lang_raw", "🌐 RAW / Інші"), "RAW")
         idx = self.filter_lang_combo.findData(self.filter_lang)
         if idx >= 0:
             self.filter_lang_combo.setCurrentIndex(idx)
+        else:
+            self.filter_lang_combo.setCurrentIndex(0)
+            self.filter_lang = "ALL"
         self.filter_lang_combo.blockSignals(False)
 
     def _populate_prog_filter(self):
@@ -3271,20 +3743,10 @@ class ManhwaApp(QMainWindow):
         if self.filter_lang == "ALL":
             return True
         fl = self.filter_lang.upper()
-
-        if item_lang:
-            norm_item = item_lang.strip().upper()
-            if fl in norm_item:
-                return True
-
-        t_upper = title_name.upper()
-        if fl == "UA" and ("[UA]" in t_upper or "(UA)" in t_upper or re.search(r'[а-яіїєґ]', title_name, re.I)):
-            return True
-        if fl == "EN" and ("[EN]" in t_upper or "(EN)" in t_upper or not re.search(r'[а-яіїєґ]', title_name, re.I)):
-            return True
-        if fl == "RAW" and ("[RAW]" in t_upper or "(RAW)" in t_upper or "RAW" in t_upper):
-            return True
-        return False
+        detected = detect_title_language(title_name, item_lang)
+        if fl == "RAW":
+            return detected not in ["UA", "EN", "RU"]
+        return fl == detected
 
     def on_switch_translation(self, trans_item: dict):
         """Switches view to the target translation."""
@@ -3455,7 +3917,19 @@ class ManhwaApp(QMainWindow):
             if self.search_query and self.search_query.lower() not in n_name.lower():
                 continue
 
+            if not self._matches_lang(n_name, None):
+                continue
+
             bm = bookmarks.get(n_name, {})
+            try:
+                files = [f for f in n_path.iterdir() if f.is_file() and not f.name.startswith(".")]
+                total_chs = len(files) if files else 1
+            except Exception:
+                total_chs = 1
+
+            if not self._matches_progress(bm, total_chs):
+                continue
+
             card = ManhwaCard(n_name, n_path, bm, self.t)
             card.read_clicked.connect(lambda name, p=n_path: self.open_novel_reader(name, p))
             card.delete_clicked.connect(self.confirm_delete_manhwa)
@@ -3485,17 +3959,25 @@ class ManhwaApp(QMainWindow):
 
         if hasattr(self.novel_reader_widget, "set_translations"):
             self.novel_reader_widget.set_translations(self.t)
-        self.novel_reader_widget.load_novel(novel_path, novel_name)
+        saved_bm = self.cfg.get("bookmarks", {}).get(novel_name, {})
+        self.novel_reader_widget.load_novel(novel_path, novel_name, saved_bookmark=saved_bm)
         # Switch to the novel reader page in stack
         self.stack.setCurrentWidget(self.novel_reader_widget)
 
-    def _on_novel_progress_changed(self, novel_name: str, ch_idx: int, percent: float):
+    def _on_novel_progress_changed(self, novel_name: str, ch_idx: int, scroll_ratio: float, overall_pct: float):
         if "bookmarks" not in self.cfg:
             self.cfg["bookmarks"] = {}
+        sb_val = 0
+        if hasattr(self, "novel_reader_widget") and hasattr(self.novel_reader_widget, "text_viewer"):
+            sb_val = self.novel_reader_widget.text_viewer.verticalScrollBar().value()
         self.cfg["bookmarks"][novel_name] = {
             "chapter": ch_idx + 1,
-            "chapter_progress": percent / 100.0,
-            "scroll_y": 0
+            "scroll_ratio": scroll_ratio,
+            "chapter_progress": scroll_ratio,
+            "scroll_value": sb_val,
+            "scroll_y": sb_val,
+            "overall_pct": overall_pct,
+            "percent": overall_pct
         }
         save_config(self.cfg)
 
@@ -3701,7 +4183,8 @@ class ManhwaApp(QMainWindow):
 
         self.reader_title_lbl = QLabel(self.t["select_manhwa"])
         self.reader_title_lbl.setStyleSheet("font-weight: 700; font-size: 14px; color: #fbbf24;")
-        self.reader_title_lbl.setMaximumWidth(220)
+        self.reader_title_lbl.setMinimumWidth(180)
+        self.reader_title_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         tb_layout.addWidget(self.reader_title_lbl)
 
         tb_layout.addStretch()
@@ -3751,12 +4234,6 @@ class ManhwaApp(QMainWindow):
 
         self.width_lbl = QLabel(self.t["width_lbl"])
         tb_layout.addWidget(self.width_lbl)
-        self.width_slider = QSlider(Qt.Orientation.Horizontal)
-        self.width_slider.setRange(600, 1400)
-        self.width_slider.setValue(self.cfg.get("reading_width", 880))
-        self.width_slider.setFixedWidth(75)
-        self.width_slider.valueChanged.connect(self.on_width_slider_change)
-        tb_layout.addWidget(self.width_slider)
 
         zoom_minus = QPushButton("－")
         zoom_minus.setFixedSize(26, 26)
@@ -3765,7 +4242,7 @@ class ManhwaApp(QMainWindow):
         tb_layout.addWidget(zoom_minus)
 
         self.zoom_lbl = QLabel(f"{int(self.cfg.get('zoom', 1.0) * 100)}%")
-        self.zoom_lbl.setStyleSheet("font-weight: 600; color: #9ca3af; min-width: 36px;")
+        self.zoom_lbl.setStyleSheet("font-weight: 600; color: #9ca3af; min-width: 38px; qproperty-alignment: AlignCenter;")
         tb_layout.addWidget(self.zoom_lbl)
 
         zoom_plus = QPushButton("＋")
@@ -3777,15 +4254,21 @@ class ManhwaApp(QMainWindow):
         self.theme_lbl = QLabel(self.t["theme_lbl"])
         tb_layout.addWidget(self.theme_lbl)
         bg_grp = QHBoxLayout()
-        bg_grp.setSpacing(4)
-        for hex_col in ["#0f1115", "#000000", "#181b23"]:
+        bg_grp.setSpacing(5)
+
+        # 3 Backgrounds: Pure Black, Pure White, Transparent (Window Theme)
+        bg_options = [
+            ("#000000", "border: 2px solid rgba(255, 255, 255, 0.4); background-color: #000000;"),
+            ("#ffffff", "border: 2px solid rgba(255, 255, 255, 0.4); background-color: #ffffff;"),
+            ("transparent", "border: 2px dashed #38bdf8; background-color: transparent;")
+        ]
+        for hex_col, btn_style in bg_options:
             btn = QPushButton()
             btn.setFixedSize(18, 18)
             btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             btn.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {hex_col};
-                    border: 2px solid rgba(255, 255, 255, 0.25);
+                    {btn_style}
                     border-radius: 9px;
                 }}
                 QPushButton:hover {{
@@ -3799,6 +4282,13 @@ class ManhwaApp(QMainWindow):
         self.zen_btn = QPushButton(self.t["hide_menu"])
         self.zen_btn.setProperty("class", "btnSecondary")
         self.zen_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.zen_btn.setStyleSheet("""
+            QPushButton {
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+        """)
         self.zen_btn.clicked.connect(self.toggle_zen_mode)
         tb_layout.addWidget(self.zen_btn)
 
@@ -3806,6 +4296,7 @@ class ManhwaApp(QMainWindow):
 
         self.canvas = WebtoonScrollCanvas(self.cfg)
         self.canvas.scroll_progress_signal.connect(self.on_reader_progress)
+        self.canvas.chapter_changed_signal.connect(self.on_reader_chapter_changed)
         self.canvas.mode_changed_signal.connect(self.on_reader_mode_changed)
         layout.addWidget(self.canvas, 1)
 
@@ -3968,11 +4459,11 @@ class ManhwaApp(QMainWindow):
         save_config(self.cfg)
 
     def adjust_zoom(self, delta: float):
-        new_zoom = round(self.canvas.zoom + delta, 1)
-        new_zoom = max(0.5, min(2.5, new_zoom))
+        new_zoom = round(self.canvas.zoom + delta, 2)
+        new_zoom = max(0.5, min(2.0, new_zoom))
         self.canvas.set_zoom(new_zoom)
         self.cfg["zoom"] = new_zoom
-        self.zoom_lbl.setText(f"{int(new_zoom * 100)}%")
+        self.zoom_lbl.setText(f"{int(round(new_zoom * 100))}%")
         save_config(self.cfg)
 
     def set_background_color(self, hex_color: str):
@@ -3980,18 +4471,42 @@ class ManhwaApp(QMainWindow):
         self.canvas.set_bg_color(hex_color)
         save_config(self.cfg)
 
-    def on_reader_progress(self, ch_num: int, pct: float):
+    def on_reader_chapter_changed(self, ch_num: int):
+        """Seamlessly updates the chapter combo selector when user scrolls into the next chapter."""
+        if hasattr(self, "chapter_combo") and self.chapter_combo.count() > 0:
+            idx = self.chapter_combo.findData(ch_num)
+            if idx >= 0 and self.chapter_combo.currentIndex() != idx:
+                self.chapter_combo.blockSignals(True)
+                self.chapter_combo.setCurrentIndex(idx)
+                self.chapter_combo.blockSignals(False)
+
+    def on_reader_progress(self, ch_num: int, ch_pct: float, overall_pct: Optional[float] = None):
         if not self.current_reading_manhwa:
             return
         scroll_y = self.canvas.verticalScrollBar().value()
         if "bookmarks" not in self.cfg:
             self.cfg["bookmarks"] = {}
 
+        if overall_pct is None:
+            # Fallback calculation if called with 2 arguments
+            overall_val = round(ch_pct * 100, 1)
+            try:
+                total_chs = len(self.chapter_combo) if hasattr(self, "chapter_combo") else 1
+                if total_chs > 1:
+                    overall_val = round(((max(0, ch_num - 1) + ch_pct) / total_chs) * 100, 1)
+            except Exception:
+                pass
+        else:
+            overall_val = round(overall_pct, 1)
+
         self.cfg["bookmarks"][self.current_reading_manhwa] = {
             "chapter": ch_num,
             "scroll_y": scroll_y,
-            "chapter_progress": round(pct, 2)
+            "chapter_progress": round(ch_pct, 4),
+            "percent": round(ch_pct * 100, 1),
+            "overall_pct": overall_val
         }
+        save_config(self.cfg)
 
     # -----------------------------------------------------------------------
     # TAB 2: TELEGRAM DOWNLOADER (Scrollable, High Contrast, Auth Support)
@@ -4371,18 +4886,92 @@ class ManhwaApp(QMainWindow):
         self.lang_combo.currentIndexChanged.connect(self.on_language_combo_change)
         grid.addWidget(self.lang_combo, 0, 1)
 
+        # Preload Mode Settings (Endless Scroll)
+        self.preload_mode_lbl = QLabel(self.t.get("preload_mode_lbl", "Режим підвантаження наступної глави:"))
+        grid.addWidget(self.preload_mode_lbl, 1, 0)
+        self.preload_mode_combo = QComboBox()
+        self.preload_mode_combo.addItem(self.t.get("preload_adaptive", "Адаптивно"), "adaptive")
+        self.preload_mode_combo.addItem(self.t.get("preload_manual", "Фіксований відсоток"), "manual")
+        self.preload_mode_combo.addItem(self.t.get("preload_disabled", "Вимкнено"), "disabled")
+        saved_pl = self.cfg.get("preload_mode", "adaptive")
+        pl_idx = self.preload_mode_combo.findData(saved_pl)
+        if pl_idx >= 0:
+            self.preload_mode_combo.setCurrentIndex(pl_idx)
+        apply_combo_style(self.preload_mode_combo)
+        self.preload_mode_combo.currentIndexChanged.connect(self._on_preload_mode_changed)
+        grid.addWidget(self.preload_mode_combo, 1, 1)
+
+        # Manual Preload Threshold row
+        self.preload_thresh_lbl = QLabel(self.t.get("preload_threshold_lbl", "Поріг підвантаження глави (%):"))
+        grid.addWidget(self.preload_thresh_lbl, 2, 0)
+        thresh_box = QHBoxLayout()
+        thresh_box.setSpacing(8)
+        self.preload_thresh_slider = QSlider(Qt.Orientation.Horizontal)
+        self.preload_thresh_slider.setRange(10, 95)
+        saved_thresh = int(self.cfg.get("manual_preload_threshold", 75))
+        self.preload_thresh_slider.setValue(saved_thresh)
+        self.preload_thresh_val_lbl = QLabel(f"{saved_thresh}%")
+        self.preload_thresh_val_lbl.setStyleSheet("font-weight: 700; color: #fbbf24; min-width: 45px;")
+        self.preload_thresh_slider.valueChanged.connect(lambda v: self.preload_thresh_val_lbl.setText(f"{v}%"))
+        thresh_box.addWidget(self.preload_thresh_slider, stretch=1)
+        thresh_box.addWidget(self.preload_thresh_val_lbl)
+        grid.addLayout(thresh_box, 2, 1)
+
+        # Apply visual enabled/disabled styling immediately
+        self._on_preload_mode_changed(0)
+
+        # Progress Display in Library
+        self.progress_display_lbl = QLabel(self.t.get("progress_display_lbl", "Відображення прогресу в бібліотеці:"))
+        grid.addWidget(self.progress_display_lbl, 3, 0)
+        self.progress_display_combo = QComboBox()
+        self.progress_display_combo.addItem(self.t.get("progress_mode_chapter", "Відсоток поточної глави"), "chapter")
+        self.progress_display_combo.addItem(self.t.get("progress_mode_overall", "Загальний відсоток від усього тайтлу"), "overall")
+        saved_disp = self.cfg.get("progress_display_mode", "chapter")
+        disp_idx = self.progress_display_combo.findData(saved_disp)
+        if disp_idx >= 0:
+            self.progress_display_combo.setCurrentIndex(disp_idx)
+        apply_combo_style(self.progress_display_combo)
+        grid.addWidget(self.progress_display_combo, 3, 1)
+
         self.settings_speed_lbl = QLabel(self.t["speed_lbl"])
-        grid.addWidget(self.settings_speed_lbl, 1, 0)
+        grid.addWidget(self.settings_speed_lbl, 4, 0)
         self.speed_slider = QSlider(Qt.Orientation.Horizontal)
         self.speed_slider.setRange(30, 160)
         self.speed_slider.setValue(self.cfg.get("scroll_speed", 75))
-        grid.addWidget(self.speed_slider, 1, 1)
+        grid.addWidget(self.speed_slider, 4, 1)
 
         self.settings_lib_lbl = QLabel(self.t["lib_lbl"])
-        grid.addWidget(self.settings_lib_lbl, 2, 0)
-        lib_inp = QLineEdit(str(self.lib_dir))
-        lib_inp.setReadOnly(True)
-        grid.addWidget(lib_inp, 2, 1)
+        grid.addWidget(self.settings_lib_lbl, 5, 0)
+        
+        lib_box = QHBoxLayout()
+        lib_box.setSpacing(8)
+        self.lib_inp = QLineEdit(str(self.lib_dir))
+        self.lib_inp.setReadOnly(False)
+        self.lib_inp.setPlaceholderText("Введіть або вставте шлях до папки бібліотеки (наприклад: D:\\my_manga)...")
+        self.lib_inp.setStyleSheet("background: #1e2030; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 8px 12px; font-size: 13px;")
+        self.lib_inp.editingFinished.connect(self._on_lib_inp_editing_finished)
+        lib_box.addWidget(self.lib_inp, stretch=1)
+        self.lib_browse_btn = QPushButton(f"📁 {self.t.get('browse_btn', 'Огляд...')}")
+        self.lib_browse_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.lib_browse_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                color: #F3F4F6;
+                font-weight: 700;
+                font-size: 13px;
+                border-radius: 8px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.16);
+                border-color: #F59E0B;
+                color: #FFFFFF;
+            }
+        """)
+        self.lib_browse_btn.clicked.connect(self._browse_library_folder)
+        lib_box.addWidget(self.lib_browse_btn)
+        grid.addLayout(lib_box, 5, 1)
 
         card_layout.addLayout(grid)
 
@@ -4470,6 +5059,140 @@ class ManhwaApp(QMainWindow):
         uc_layout.addWidget(self.settings_unpack_status)
 
         layout.addWidget(unpack_card)
+
+        # Card 3: Background Music & Ambient Atmosphere (Beta)
+        music_card = QFrame()
+        music_card.setProperty("class", "cardPane")
+        mc_layout = QVBoxLayout(music_card)
+        mc_layout.setContentsMargins(24, 24, 24, 24)
+        mc_layout.setSpacing(14)
+
+        self.music_title = QLabel(self.t.get("music_card_title", "🎵 Фонова музика та атмосфера (Бета 🛠️🚧)"))
+        self.music_title.setStyleSheet("font-size: 17px; font-weight: 700; color: #a78bfa;")
+        mc_layout.addWidget(self.music_title)
+
+        self.music_sub = QLabel(self.t.get("music_card_sub", "Атмосферний звуковий ембієнт для повного занурення в манхву та новели:"))
+        self.music_sub.setStyleSheet("font-size: 13px; color: #9ca3af;")
+        mc_layout.addWidget(self.music_sub)
+
+        mc_grid = QGridLayout()
+        mc_grid.setSpacing(14)
+
+        self.music_enable_toggle = NeoToggle(
+            self.t.get("music_enable_lbl", "Увімкнути фоновий ембієнт:"),
+            "",
+            checked=self.cfg.get("music_enabled", False),
+            parent=self
+        )
+        self.music_enable_toggle.toggled.connect(self._on_music_enabled_toggled)
+        mc_grid.addWidget(self.music_enable_toggle, 0, 0, 1, 2)
+
+        self.music_preset_lbl = QLabel(self.t.get("music_preset_lbl", "Режим відтворення / Фоновий трек:"))
+        mc_grid.addWidget(self.music_preset_lbl, 1, 0)
+        self.music_preset_combo = QComboBox()
+        self._populate_music_presets()
+        self.music_preset_combo.currentIndexChanged.connect(self._on_music_preset_changed)
+        apply_combo_style(self.music_preset_combo)
+        mc_grid.addWidget(self.music_preset_combo, 1, 1)
+
+        self.music_vol_lbl = QLabel(self.t.get("music_vol_lbl", "Гучність звуку:"))
+        mc_grid.addWidget(self.music_vol_lbl, 2, 0)
+        self.music_vol_slider = QSlider(Qt.Orientation.Horizontal)
+        self.music_vol_slider.setRange(0, 100)
+        self.music_vol_slider.setValue(self.cfg.get("music_volume", 40))
+        self.music_vol_slider.valueChanged.connect(self._on_music_volume_value_changed)
+        mc_grid.addWidget(self.music_vol_slider, 2, 1)
+
+        # Row 3: Gemini API Key Input
+        self.gemini_key_lbl = QLabel(self.t.get("gemini_key_lbl", "Ключ Google Gemini API:"))
+        mc_grid.addWidget(self.gemini_key_lbl, 3, 0)
+
+        key_box = QHBoxLayout()
+        key_box.setSpacing(8)
+        self.gemini_key_inp = QLineEdit(self.cfg.get("gemini_api_key", ""))
+        self.gemini_key_inp.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gemini_key_inp.setPlaceholderText(self.t.get("gemini_key_ph", "Введіть Gemini API Key..."))
+        self.gemini_key_inp.setStyleSheet("background: #1e2030; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 12px; font-size: 13px;")
+        self.gemini_key_inp.textChanged.connect(lambda: self._update_gemini_status_display())
+
+        # Toggle visibility
+        self.gemini_toggle_vis_btn = QPushButton("👁")
+        self.gemini_toggle_vis_btn.setFixedSize(36, 32)
+        self.gemini_toggle_vis_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.gemini_toggle_vis_btn.setToolTip(self.t.get("show_key_tip", "Показати / приховати ключ"))
+        self.gemini_toggle_vis_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 8px;
+                color: #FFFFFF;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.16);
+                border-color: #F59E0B;
+            }
+        """)
+        self.gemini_toggle_vis_btn.clicked.connect(self._toggle_gemini_key_visibility)
+
+        # Clear key button
+        self.gemini_clear_btn = QPushButton("✕")
+        self.gemini_clear_btn.setFixedSize(36, 32)
+        self.gemini_clear_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.gemini_clear_btn.setToolTip(self.t.get("clear_key_tip", "Очистити / видалити ключ"))
+        self.gemini_clear_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(239, 68, 68, 0.15);
+                border: 1px solid rgba(239, 68, 68, 0.4);
+                border-radius: 8px;
+                color: #f87171;
+                font-weight: 800;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background: rgba(239, 68, 68, 0.25);
+                border-color: #ef4444;
+            }
+        """)
+        self.gemini_clear_btn.clicked.connect(self._on_gemini_key_cleared)
+
+        key_box.addWidget(self.gemini_key_inp, stretch=1)
+        key_box.addWidget(self.gemini_toggle_vis_btn)
+        key_box.addWidget(self.gemini_clear_btn)
+        mc_grid.addLayout(key_box, 3, 1)
+
+        # Row 4: Status Indicator & Instant Save Button
+        status_box = QHBoxLayout()
+        self.gemini_status_lbl = QLabel("")
+        self._update_gemini_status_display()
+        status_box.addWidget(self.gemini_status_lbl, 1)
+
+        self.music_save_btn = QPushButton("💾 Зберегти налаштування звуку")
+        self.music_save_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.music_save_btn.setStyleSheet("""
+            QPushButton {
+                background: #0d9488;
+                color: #ffffff;
+                font-weight: 700;
+                font-size: 12px;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 14px;
+            }
+            QPushButton:hover {
+                background: #14b8a6;
+            }
+        """)
+        self.music_save_btn.clicked.connect(self.save_settings)
+        status_box.addWidget(self.music_save_btn)
+        mc_layout.addLayout(mc_grid)
+
+        self.music_notice_lbl = QLabel(self.t.get("music_beta_notice", "Звуковий рушій бере аудіо з папки sounds/ (поруч із library/). Підтримуються як окремі файли, так і підпапки (наприклад sounds/ambient/forest/)."))
+        self.music_notice_lbl.setStyleSheet("font-size: 12px; color: #cbd5e1; background-color: rgba(167, 139, 250, 0.12); border: 1px dashed rgba(167, 139, 250, 0.4); border-radius: 8px; padding: 10px;")
+        self.music_notice_lbl.setWordWrap(True)
+        mc_layout.addWidget(self.music_notice_lbl)
+
+        layout.addWidget(music_card)
         layout.addStretch()
 
         self._populate_settings_manhwa_list()
@@ -4576,6 +5299,220 @@ class ManhwaApp(QMainWindow):
             self.settings_unpack_status.setText(err_tmpl.format(err=e))
             self.settings_unpack_status.setStyleSheet("color: #f87171; font-weight: 600;")
 
+    def _browse_library_folder(self):
+        try:
+            start_dir = str(self.lib_dir.resolve()) if self.lib_dir.exists() else ""
+            caption = self.t.get("select_lib_folder", "Виберіть папку бібліотеки")
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                caption,
+                start_dir,
+                QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontUseNativeDialog
+            )
+            if folder:
+                p = Path(folder).resolve()
+                self.lib_inp.setText(str(p))
+                self.lib_dir = p
+                self.cfg["library_path"] = str(p)
+                save_config(self.cfg)
+                if hasattr(self, "refresh_catalog"):
+                    self.refresh_catalog()
+        except Exception as e:
+            logger.error(f"Error picking directory: {e}")
+
+    def _on_lib_inp_editing_finished(self):
+        txt = self.lib_inp.text().strip()
+        if txt:
+            try:
+                p = Path(txt).resolve()
+                if p != self.lib_dir:
+                    p.mkdir(parents=True, exist_ok=True)
+                    self.lib_dir = p
+                    self.cfg["library_path"] = str(p)
+                    save_config(self.cfg)
+                    if hasattr(self, "refresh_catalog"):
+                        self.refresh_catalog()
+            except Exception as e:
+                logger.error(f"Error updating library path from text: {e}")
+
+    def _toggle_gemini_key_visibility(self):
+        if not hasattr(self, "gemini_key_inp"):
+            return
+        if self.gemini_key_inp.echoMode() == QLineEdit.EchoMode.Password:
+            self.gemini_key_inp.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.gemini_key_inp.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def _update_gemini_status_display(self):
+        if not hasattr(self, "gemini_status_lbl") or not hasattr(self, "gemini_key_inp"):
+            return
+        val = self.gemini_key_inp.text().strip()
+        if val:
+            self.gemini_status_lbl.setText(self.t.get("gemini_status_configured", "🟢 Gemini API Key налаштовано"))
+            self.gemini_status_lbl.setStyleSheet("font-size: 12px; color: #34d399; font-weight: 700;")
+        else:
+            self.gemini_status_lbl.setText(self.t.get("gemini_status_none", "⚪ Ключ не вказано (буде використано базові звуки)"))
+            self.gemini_status_lbl.setStyleSheet("font-size: 12px; color: #94a3b8; font-weight: 600;")
+
+        # Auto-persist key immediately
+        if self.cfg.get("gemini_api_key") != val:
+            self.cfg["gemini_api_key"] = val
+            save_config(self.cfg)
+            if hasattr(self, "ai_analyzer") and self.ai_analyzer:
+                self.ai_analyzer.set_api_key(val)
+
+    def _on_gemini_key_cleared(self):
+        if hasattr(self, "gemini_key_inp"):
+            self.gemini_key_inp.clear()
+            self.cfg["gemini_api_key"] = ""
+            save_config(self.cfg)
+            if hasattr(self, "ai_analyzer") and self.ai_analyzer:
+                self.ai_analyzer.set_api_key("")
+            self._update_gemini_status_display()
+
+    def _open_sound_studio(self):
+        try:
+            if SoundStudioWindow is None:
+                return
+            sounds_dir = BASE_DIR / "sounds"
+            dlg = SoundStudioWindow(sounds_dir, self)
+            dlg.exec()
+            if hasattr(self, "sound_engine") and self.sound_engine:
+                self.sound_engine.reload_recipes()
+        except Exception as e:
+            logger.error(f"Failed to open SoundStudio: {e}")
+
+    def _on_preload_mode_changed(self, idx: int):
+        mode = self.preload_mode_combo.currentData() if hasattr(self, "preload_mode_combo") else "adaptive"
+        is_manual = (mode == "manual")
+        if hasattr(self, "preload_thresh_slider"):
+            self.preload_thresh_slider.setEnabled(is_manual)
+            if is_manual:
+                self.preload_thresh_slider.setStyleSheet("""
+                    QSlider::groove:horizontal {
+                        height: 6px;
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #3b82f6);
+                        border-radius: 3px;
+                    }
+                    QSlider::handle:horizontal {
+                        background: #fbbf24;
+                        width: 14px;
+                        margin: -4px 0;
+                        border-radius: 7px;
+                    }
+                """)
+            else:
+                self.preload_thresh_slider.setStyleSheet("""
+                    QSlider::groove:horizontal {
+                        height: 6px;
+                        background: rgba(255, 255, 255, 0.08);
+                        border-radius: 3px;
+                    }
+                    QSlider::handle:horizontal {
+                        background: #4b5563;
+                        width: 14px;
+                        margin: -4px 0;
+                        border-radius: 7px;
+                    }
+                """)
+        if hasattr(self, "preload_thresh_lbl"):
+            self.preload_thresh_lbl.setEnabled(is_manual)
+            if is_manual:
+                self.preload_thresh_lbl.setStyleSheet("color: #d1d5db;")
+            else:
+                self.preload_thresh_lbl.setStyleSheet("color: #6b7280;")
+        if hasattr(self, "preload_thresh_val_lbl"):
+            self.preload_thresh_val_lbl.setEnabled(is_manual)
+            if is_manual:
+                self.preload_thresh_val_lbl.setStyleSheet("font-weight: 700; color: #fbbf24; min-width: 45px;")
+            else:
+                self.preload_thresh_val_lbl.setStyleSheet("font-weight: 700; color: #6b7280; min-width: 45px;")
+
+    def _populate_music_presets(self):
+        """Unified single source of truth for filling music_preset_combo across language changes."""
+        if not hasattr(self, "music_preset_combo"):
+            return
+        curr_preset = self.music_preset_combo.currentData() or self.cfg.get("music_preset", "ai_adaptive")
+        self.music_preset_combo.blockSignals(True)
+        self.music_preset_combo.clear()
+
+        # 1. AI adaptive option
+        ai_title = self.t.get("music_preset_ai_adaptive", "✨ ШІ-Адаптивний Саундтрек (динамічно за сценами)")
+        self.music_preset_combo.addItem(ai_title, "ai_adaptive")
+
+        # 2. My sounds
+        my_sounds_path = BASE_DIR / "sounds" / "my_sounds"
+        my_tpl = self.t.get("music_preset_my_sounds", "⭐ [Мої треки] {name}")
+        if my_sounds_path.exists():
+            for f in sorted(list(my_sounds_path.glob("*.*"))):
+                if f.suffix.lower() in [".mp3", ".ogg", ".wav"]:
+                    self.music_preset_combo.addItem(my_tpl.format(name=f.stem), f"my_sounds:{f.stem}")
+
+        # 3. UI soundtrack tracks
+        ui_path = BASE_DIR / "sounds" / "ui"
+        ui_tpl = self.t.get("music_preset_ui", "🎶 [Саундтрек] {name}")
+        if ui_path.exists():
+            for f in sorted(list(ui_path.glob("*.*"))):
+                if f.suffix.lower() in [".mp3", ".ogg", ".wav"] and f.stem != "test_sound":
+                    self.music_preset_combo.addItem(ui_tpl.format(name=f.stem), f"ui:{f.stem}")
+
+        p_idx = self.music_preset_combo.findData(curr_preset)
+        if p_idx >= 0:
+            self.music_preset_combo.setCurrentIndex(p_idx)
+        else:
+            self.music_preset_combo.setCurrentIndex(0)
+        self.music_preset_combo.blockSignals(False)
+
+    def _on_music_volume_value_changed(self, val: int):
+        """Clean volume adjustment without overlapping preview sounds."""
+        try:
+            self.cfg["music_volume"] = int(val)
+            if hasattr(self, "sound_engine") and self.sound_engine:
+                self.sound_engine.set_volume(val)
+        except Exception as e:
+            logger.debug(f"Volume change error: {e}")
+
+    def _on_music_preset_changed(self, idx: int):
+        """Switch audio preset or AI mode cleanly without playing multiple tracks at once."""
+        try:
+            if not hasattr(self, "music_preset_combo"):
+                return
+            data = self.music_preset_combo.currentData()
+            if not data or not hasattr(self, "sound_engine") or not self.sound_engine:
+                return
+
+            self.cfg["music_preset"] = data
+            save_config(self.cfg)
+
+            # Prevent competing audio layers: stop all previous audio before switching!
+            self.sound_engine.stop_all(fade=False)
+
+            if data == "ai_adaptive":
+                # AI mode active: reader canvas will feed cues dynamically on scroll
+                pass
+            else:
+                self.sound_engine.set_enabled(True)
+                if hasattr(self, "music_enable_toggle"):
+                    self.music_enable_toggle.setChecked(True)
+                vol = self.music_vol_slider.value() if hasattr(self, "music_vol_slider") else 50
+                self.sound_engine.set_volume(vol)
+                track_name = data.split(":", 1)[-1] if ":" in data else data
+                self.sound_engine.play_ambient(track_name, fade_ms=300)
+        except Exception as e:
+            logger.debug(f"Preset change error: {e}")
+
+    def _on_music_enabled_toggled(self, checked: bool):
+        """Immediately syncs sound engine enabled state."""
+        try:
+            if hasattr(self, "sound_engine") and self.sound_engine:
+                self.sound_engine.set_enabled(checked)
+                if not checked:
+                    self.sound_engine.stop_all(fade=True)
+                    if hasattr(self, "_test_audio_player") and self._test_audio_player:
+                        self._test_audio_player.stop()
+        except Exception as e:
+            logger.debug(f"Music toggle error: {e}")
+
     def on_language_combo_change(self, idx: int):
         new_lang = self.lang_combo.currentData()
         if not new_lang or new_lang == self.lang:
@@ -4590,6 +5527,51 @@ class ManhwaApp(QMainWindow):
         new_lang = self.lang_combo.currentData()
         self.cfg["language"] = new_lang
         self.cfg["scroll_speed"] = self.speed_slider.value()
+        if hasattr(self, "preload_mode_combo"):
+            self.cfg["preload_mode"] = self.preload_mode_combo.currentData() or "adaptive"
+        if hasattr(self, "preload_thresh_slider"):
+            self.cfg["manual_preload_threshold"] = self.preload_thresh_slider.value()
+        if hasattr(self, "progress_display_combo"):
+            self.cfg["progress_display_mode"] = self.progress_display_combo.currentData() or "chapter"
+        if hasattr(self, "music_enable_toggle"):
+            self.cfg["music_enabled"] = self.music_enable_toggle.isChecked()
+        if hasattr(self, "music_preset_combo"):
+            self.cfg["music_preset"] = self.music_preset_combo.currentData() or "ai_adaptive"
+        if hasattr(self, "music_vol_slider"):
+            self.cfg["music_volume"] = self.music_vol_slider.value()
+
+        # Update Gemini API Key
+        if hasattr(self, "gemini_key_inp"):
+            new_key = self.gemini_key_inp.text().strip()
+            self.cfg["gemini_api_key"] = new_key
+            if hasattr(self, "ai_analyzer") and self.ai_analyzer:
+                self.ai_analyzer.set_api_key(new_key)
+            self._update_gemini_status_display()
+
+        # Update Sound Engine state
+        if hasattr(self, "sound_engine") and self.sound_engine:
+            self.sound_engine.set_enabled(self.cfg.get("music_enabled", False))
+            self.sound_engine.set_volume(self.cfg.get("music_volume", 40))
+
+        # Update library path if changed
+        if hasattr(self, "lib_inp") and self.lib_inp.text().strip():
+            new_p = Path(self.lib_inp.text().strip()).resolve()
+            if new_p != self.lib_dir:
+                try:
+                    default_lib = (BASE_DIR / "library").resolve()
+                    if new_p == default_lib:
+                        self.cfg["library_path"] = "library"
+                    else:
+                        self.cfg["library_path"] = str(new_p)
+                    new_p.mkdir(parents=True, exist_ok=True)
+                    self.lib_dir = new_p
+                    if hasattr(self, "refresh_catalog"):
+                        self.refresh_catalog()
+                    if hasattr(self, "populate_unpack_manhwas"):
+                        self.populate_unpack_manhwas()
+                except Exception as e:
+                    logger.error(f"Failed to update library folder: {e}")
+
         save_config(self.cfg)
 
         if new_lang != self.lang:
@@ -4723,10 +5705,45 @@ class ManhwaApp(QMainWindow):
             self.settings_card_title.setText(self.t["settings_title"])
         if hasattr(self, "settings_lang_lbl"):
             self.settings_lang_lbl.setText(self.t["lang_lbl"])
+
+        # Retranslate preload controls
+        if hasattr(self, "preload_mode_lbl"):
+            self.preload_mode_lbl.setText(self.t.get("preload_mode_lbl", "Режим підвантаження наступної глави:"))
+        if hasattr(self, "preload_mode_combo"):
+            curr_pl = self.preload_mode_combo.currentData()
+            self.preload_mode_combo.blockSignals(True)
+            self.preload_mode_combo.clear()
+            self.preload_mode_combo.addItem(self.t.get("preload_adaptive", "Адаптивно"), "adaptive")
+            self.preload_mode_combo.addItem(self.t.get("preload_manual", "Фіксований відсоток"), "manual")
+            self.preload_mode_combo.addItem(self.t.get("preload_disabled", "Вимкнено"), "disabled")
+            p_idx = self.preload_mode_combo.findData(curr_pl)
+            if p_idx >= 0:
+                self.preload_mode_combo.setCurrentIndex(p_idx)
+            self.preload_mode_combo.blockSignals(False)
+
+        if hasattr(self, "preload_thresh_lbl"):
+            self.preload_thresh_lbl.setText(self.t.get("preload_threshold_lbl", "Поріг підвантаження глави (%):"))
+
+        # Retranslate progress display in library
+        if hasattr(self, "progress_display_lbl"):
+            self.progress_display_lbl.setText(self.t.get("progress_display_lbl", "Відображення прогресу в бібліотеці:"))
+        if hasattr(self, "progress_display_combo"):
+            curr_dp = self.progress_display_combo.currentData()
+            self.progress_display_combo.blockSignals(True)
+            self.progress_display_combo.clear()
+            self.progress_display_combo.addItem(self.t.get("progress_mode_chapter", "Відсоток поточної глави"), "chapter")
+            self.progress_display_combo.addItem(self.t.get("progress_mode_overall", "Загальний відсоток від усього тайтлу"), "overall")
+            dp_idx = self.progress_display_combo.findData(curr_dp)
+            if dp_idx >= 0:
+                self.progress_display_combo.setCurrentIndex(dp_idx)
+            self.progress_display_combo.blockSignals(False)
+
         if hasattr(self, "settings_speed_lbl"):
             self.settings_speed_lbl.setText(self.t["speed_lbl"])
         if hasattr(self, "settings_lib_lbl"):
             self.settings_lib_lbl.setText(self.t["lib_lbl"])
+        if hasattr(self, "lib_browse_btn"):
+            self.lib_browse_btn.setText(f"📁 {self.t.get('browse_btn', 'Огляд...')}")
         if hasattr(self, "save_btn"):
             self.save_btn.setText(self.t["save_btn"])
         if hasattr(self, "uc_title"):
@@ -4740,6 +5757,31 @@ class ManhwaApp(QMainWindow):
         if hasattr(self, "unpack_action_btn"):
             self.unpack_action_btn.setText(self.t["manual_unpack_btn"])
         self._populate_settings_manhwa_list()
+
+        # Music settings Card
+        if hasattr(self, "music_title"):
+            self.music_title.setText(self.t.get("music_card_title", "🎵 Фонова музика та атмосфера (Бета 🛠️🚧)"))
+        if hasattr(self, "music_sub"):
+            self.music_sub.setText(self.t.get("music_card_sub", "Атмосферний звуковий ембієнт для повного занурення в манхву та новели:"))
+        if hasattr(self, "music_enable_toggle"):
+            self.music_enable_toggle.set_texts(self.t.get("music_enable_lbl", "Увімкнути фоновий ембієнт:"), "")
+        if hasattr(self, "music_preset_lbl"):
+            self.music_preset_lbl.setText(self.t.get("music_preset_lbl", "Атмосферний пресет:"))
+        if hasattr(self, "music_vol_lbl"):
+            self.music_vol_lbl.setText(self.t.get("music_vol_lbl", "Гучність музики та ефектів:"))
+        if hasattr(self, "music_preset_combo"):
+            self._populate_music_presets()
+        if hasattr(self, "music_notice_lbl"):
+            self.music_notice_lbl.setText(self.t.get("music_beta_notice", "🛠️ Звуковий рушій наразі у режимі бета-тестування. Пресети та ШІ-адаптивний саундтрек проходять калібрування."))
+        if hasattr(self, "gemini_key_lbl"):
+            self.gemini_key_lbl.setText(self.t.get("gemini_key_lbl", "Ключ Google Gemini API:"))
+        if hasattr(self, "gemini_key_inp"):
+            self.gemini_key_inp.setPlaceholderText(self.t.get("gemini_key_ph", "Введіть Gemini API Key..."))
+        if hasattr(self, "gemini_toggle_vis_btn"):
+            self.gemini_toggle_vis_btn.setToolTip(self.t.get("show_key_tip", "Показати / приховати ключ"))
+        if hasattr(self, "gemini_clear_btn"):
+            self.gemini_clear_btn.setToolTip(self.t.get("clear_key_tip", "Очистити / видалити ключ"))
+        self._update_gemini_status_display()
 
         # Embedded Novel Reader tab if active
         if hasattr(self, "novel_reader_widget") and self.novel_reader_widget is not None:
@@ -4854,18 +5896,44 @@ class ManhwaApp(QMainWindow):
 
         prev_idx = self.stack.currentIndex()
         self.stack.setCurrentIndex(index)
-        if prev_idx == 1 and index != 1:
-            if hasattr(self, "canvas"):
-                self.canvas.clear_canvas()
-            if self.current_cloud_worker and self.current_cloud_worker.isRunning():
-                try:
-                    self.current_cloud_worker.cancel()
-                    self.current_cloud_worker.quit()
-                except Exception:
-                    pass
+
+        # Stop preview test sound immediately whenever leaving settings tab (index 3)
+        if prev_idx == 3 and index != 3:
+            if hasattr(self, "sound_engine") and self.sound_engine:
+                if self.sound_engine.current_mood == "test_sound":
+                    self.sound_engine.stop_all(fade=False)
+
+        # UI Sound feedback and smooth ambient fade when navigating
+        if hasattr(self, "_test_audio_player") and self._test_audio_player:
+            self._test_audio_player.stop()
+
+        if hasattr(self, "sound_engine") and self.sound_engine:
+            self.sound_engine.play_ui_sound("click")
+            # If leaving the reader tab (index 1), smoothly fade out and stop all playing audio layers
+            if prev_idx == 1 and index != 1:
+                self.sound_engine.stop_all(fade=True)
+
+        # We do NOT clear canvas on tab switch so that returning to reader tab preserves the chapter and scroll!
 
         if index == 0:
             self.refresh_catalog()
+        elif index == 1:
+            # If returning to reader tab, restore audio on the active scroll position
+            if hasattr(self, "sound_engine") and self.sound_engine and self.sound_engine.is_enabled:
+                if hasattr(self, "canvas") and self.canvas.page_labels:
+                    # Trigger scroll position evaluation to resume bg & amb layers smoothly
+                    val = self.canvas.verticalScrollBar().value()
+                    self.canvas.on_scroll(val)
+
+            # If returning to reader tab but canvas was somehow empty and manhwa was selected, reload it
+            if self.current_reading_manhwa and hasattr(self, "canvas") and not self.canvas.page_labels:
+                ch_num = self.chapter_combo.currentData() or 1
+                if self.is_cloud_reading:
+                    self.load_cloud_chapter(self.current_reading_manhwa, ch_num)
+                else:
+                    m_path = self.lib_dir / self.current_reading_manhwa
+                    if m_path.exists():
+                        self.canvas.load_manhwa_chapter(m_path, ch_num, 0)
         elif index == 2:
             self.check_auth_status()
         elif index == 3:

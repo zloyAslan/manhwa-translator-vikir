@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QPoint
 from PyQt6.QtGui import QFont, QColor, QKeySequence, QShortcut, QCursor
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextBrowser, QPushButton,
@@ -32,6 +32,20 @@ except ImportError:
     except ImportError:
         from novel_reader.parsers.novel_parser import EpubParser, DocxParser
 
+try:
+    from manhwa_reader.reader import save_config
+except ImportError:
+    try:
+        from reader import save_config
+    except ImportError:
+        def save_config(cfg):
+            try:
+                cfg_path = Path(__file__).resolve().parent.parent / "config.json"
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, indent=4, ensure_ascii=False)
+            except Exception:
+                pass
+
 
 class NovelTextBrowser(QTextBrowser):
     """
@@ -43,6 +57,11 @@ class NovelTextBrowser(QTextBrowser):
         super().__init__(parent)
         self.owner = owner
         self._boundary_cooldown = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self.owner, "reading_marker"):
+            self.owner.reading_marker.move(22, 75)
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -99,7 +118,7 @@ class NovelReaderWindow(QWidget):
     Can be used standalone or embedded as a tab/page.
     """
     back_to_library_requested = pyqtSignal()
-    progress_changed = pyqtSignal(str, int, float)  # novel_id, chapter_idx, percent
+    progress_changed = pyqtSignal(str, int, float, float)  # novel_id, chapter_idx, scroll_ratio, overall_percent
 
     def __init__(self, parent=None, t: dict = None):
         super().__init__(parent)
@@ -108,7 +127,9 @@ class NovelReaderWindow(QWidget):
         self.novel_path: Optional[Path] = None
         self.chapters: List[Dict[str, Any]] = []
         self.current_ch_index = 0
-        self.font_size = 17
+        p = self.parent()
+        self.font_size = p.cfg.get("novel_font_size", 17) if (p and hasattr(p, "cfg")) else 17
+        self.bg_plate_mode = p.cfg.get("novel_bg_plate", True) if (p and hasattr(p, "cfg")) else True
         self.is_zen_mode = False
 
         self.init_ui()
@@ -237,6 +258,14 @@ class NovelReaderWindow(QWidget):
         """)
         tb_layout.addWidget(self.progress_pill)
 
+        # Background plate toggle (round button)
+        self.bg_toggle_btn = QPushButton("●")
+        self.bg_toggle_btn.setFixedSize(30, 30)
+        self.bg_toggle_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.bg_toggle_btn.setToolTip(self.t.get("novel_bg_toggle_tip", "Змінити підкладку фону (темна/прозора)"))
+        self.bg_toggle_btn.clicked.connect(self.toggle_bg_plate)
+        tb_layout.addWidget(self.bg_toggle_btn)
+
         # Hide Menu (Zen Mode) Button — Exactly like in manhwa reader
         self.zen_btn = QPushButton(self.t.get("hide_menu", "Сховати меню (H)"))
         self.zen_btn.setProperty("class", "btnSecondary")
@@ -265,33 +294,27 @@ class NovelReaderWindow(QWidget):
         # 2. Reading Text Area
         self.text_viewer = NovelTextBrowser(self)
         self.text_viewer.setOpenExternalLinks(False)
-        self.text_viewer.setStyleSheet("""
-            QTextBrowser {
-                background-color: #090B10;
-                border: none;
-                padding: 10px 40px;
-                selection-background-color: #F59E0B;
-                selection-color: #000000;
-            }
-            QScrollBar:vertical {
-                background: #090B10;
-                width: 8px;
-                border: none;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #F59E0B;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none; background: none;
-            }
-        """)
         self.text_viewer.verticalScrollBar().valueChanged.connect(self.on_scroll)
         self.main_layout.addWidget(self.text_viewer, stretch=1)
+
+        # Pinned reading marker arrow (indicates reading line ~3 lines below top toolbar)
+        self.reading_marker = QLabel("-->", self.text_viewer)
+        self.reading_marker.setFixedSize(48, 28)
+        self.reading_marker.setStyleSheet("""
+            QLabel {
+                color: #FFFFFF;
+                font-size: 19px;
+                font-weight: 900;
+                font-family: 'Consolas', 'Courier New', monospace;
+                background: transparent;
+            }
+        """)
+        self.reading_marker.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.reading_marker.move(22, 75)
+        self.reading_marker.show()
+
+        # Apply initial theme & underlay styling
+        self.apply_bg_plate_style()
 
     def _btn_nav_style(self) -> str:
         return """
@@ -309,7 +332,7 @@ class NovelReaderWindow(QWidget):
             }
         """
 
-    def load_novel(self, file_or_dir: Path, title: Optional[str] = None):
+    def load_novel(self, file_or_dir: Path, title: Optional[str] = None, saved_bookmark: Optional[dict] = None):
         self.novel_path = file_or_dir
         self.novel_title = title or file_or_dir.stem
         self.title_lbl.setText(f"📖 {self.novel_title}")
@@ -403,8 +426,29 @@ class NovelReaderWindow(QWidget):
             self.ch_combo.addItem(display_title, idx)
         self.ch_combo.blockSignals(False)
 
+        # Restore saved bookmark if available
+        start_ch_idx = 0
+        restore_scroll_ratio = 0.0
+        saved_scroll_val = None
+        if saved_bookmark:
+            saved_ch = saved_bookmark.get("chapter", 1)
+            # Find chapter index matching saved_ch or index
+            if 1 <= saved_ch <= len(self.chapters):
+                start_ch_idx = saved_ch - 1
+            restore_scroll_ratio = float(saved_bookmark.get("scroll_ratio", saved_bookmark.get("chapter_progress", 0.0)))
+            saved_scroll_val = saved_bookmark.get("scroll_value", saved_bookmark.get("scroll_y", None))
+
         if self.chapters:
-            self.display_chapter(0)
+            self.display_chapter(start_ch_idx)
+            def _restore_scroll():
+                sb = self.text_viewer.verticalScrollBar()
+                if saved_scroll_val is not None and isinstance(saved_scroll_val, (int, float)) and saved_scroll_val > 0:
+                    sb.setValue(min(sb.maximum(), int(saved_scroll_val)))
+                elif restore_scroll_ratio > 0.0:
+                    target_val = int(sb.maximum() * restore_scroll_ratio)
+                    sb.setValue(target_val)
+                self.update_progress()
+            QTimer.singleShot(150, _restore_scroll)
 
     def display_chapter(self, index: int):
         if not (0 <= index < len(self.chapters)):
@@ -431,7 +475,7 @@ class NovelReaderWindow(QWidget):
                 font-size: {self.font_size}px;
                 line-height: 1.75;
                 color: #FFFFFF;
-                background-color: #090B10;
+                background-color: {'#090B10' if self.bg_plate_mode else 'transparent'};
                 max-width: 820px;
                 margin: 0 auto;
             }}
@@ -460,6 +504,70 @@ class NovelReaderWindow(QWidget):
         self.text_viewer.verticalScrollBar().setValue(0)
         self.update_progress()
 
+    def toggle_bg_plate(self):
+        self.bg_plate_mode = not self.bg_plate_mode
+        p = self.parent()
+        if p and hasattr(p, "cfg"):
+            p.cfg["novel_bg_plate"] = self.bg_plate_mode
+            save_config(p.cfg)
+        self.apply_bg_plate_style()
+        self.display_chapter(self.current_ch_index)
+
+    def apply_bg_plate_style(self):
+        if self.bg_plate_mode:
+            plate_bg = "#090B10"
+            btn_border = "#F59E0B"
+            btn_col = "#F59E0B"
+            root_bg = "#090B10"
+        else:
+            plate_bg = "transparent"
+            btn_border = "rgba(255, 255, 255, 0.3)"
+            btn_col = "rgba(255, 255, 255, 0.4)"
+            root_bg = "transparent"
+
+        self.setStyleSheet(f"QWidget#NovelReaderRoot {{ background-color: {root_bg}; color: #FFFFFF; }}")
+        self.text_viewer.setStyleSheet(f"""
+            QTextBrowser {{
+                background-color: {plate_bg};
+                border: none;
+                padding: 10px 48px;
+                selection-background-color: #F59E0B;
+                selection-color: #000000;
+            }}
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 8px;
+                border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: #F59E0B;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none; background: none;
+            }}
+        """)
+        if hasattr(self, "bg_toggle_btn"):
+            self.bg_toggle_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(255, 255, 255, 0.06);
+                    border: 2px solid {btn_border};
+                    border-radius: 15px;
+                    color: {btn_col};
+                    font-size: 14px;
+                    font-weight: 800;
+                }}
+                QPushButton:hover {{
+                    background: rgba(255, 255, 255, 0.15);
+                    border-color: #F59E0B;
+                    color: #FFFFFF;
+                }}
+            """)
+
     def on_chapter_selected(self, idx: int):
         if idx >= 0 and idx != self.current_ch_index:
             self.display_chapter(idx)
@@ -478,11 +586,19 @@ class NovelReaderWindow(QWidget):
     def increase_font(self):
         if self.font_size < 32:
             self.font_size += 2
+            p = self.parent()
+            if p and hasattr(p, "cfg"):
+                p.cfg["novel_font_size"] = self.font_size
+                save_config(p.cfg)
             self.display_chapter(self.current_ch_index)
 
     def decrease_font(self):
         if self.font_size > 12:
             self.font_size -= 2
+            p = self.parent()
+            if p and hasattr(p, "cfg"):
+                p.cfg["novel_font_size"] = self.font_size
+                save_config(p.cfg)
             self.display_chapter(self.current_ch_index)
 
     def on_scroll(self):
@@ -528,10 +644,21 @@ class NovelReaderWindow(QWidget):
         sb = self.text_viewer.verticalScrollBar()
         total_ch = len(self.chapters) if self.chapters else 1
         
-        scroll_pct = (sb.value() / sb.maximum()) if sb.maximum() > 0 else 0.0
+        # Calculate reading line progress using marker offset (~75px from top)
+        cursor = self.text_viewer.cursorForPosition(QPoint(75, 75))
+        total_doc_chars = self.text_viewer.document().characterCount()
+
+        if total_doc_chars > 1 and cursor.position() > 0:
+            scroll_ratio = cursor.position() / float(total_doc_chars)
+        elif sb.maximum() > 0:
+            scroll_ratio = sb.value() / float(sb.maximum())
+        else:
+            scroll_ratio = 0.0
+
+        scroll_ratio = min(1.0, max(0.0, scroll_ratio))
         # Overall progress with 1 decimal place precision
-        overall_pct = ((self.current_ch_index + scroll_pct) / total_ch) * 100.0
+        overall_pct = ((self.current_ch_index + scroll_ratio) / total_ch) * 100.0
         overall_pct = min(100.0, max(0.0, overall_pct))
         
         self.progress_pill.setText(f"{overall_pct:.1f}%")
-        self.progress_changed.emit(self.novel_title, self.current_ch_index, overall_pct)
+        self.progress_changed.emit(self.novel_title, self.current_ch_index, scroll_ratio, overall_pct)

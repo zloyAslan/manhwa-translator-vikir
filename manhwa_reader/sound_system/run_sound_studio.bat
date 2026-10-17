@@ -1,0 +1,5 @@
+@echo off
+chcp 65001 > nul
+cd /d "%~dp0"
+start "" "%~dp0..\..\.venv\Scripts\pythonw.exe" "%~dp0sound_studio.py"
+exit

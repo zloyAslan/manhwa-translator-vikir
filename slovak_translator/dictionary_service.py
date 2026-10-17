@@ -77,6 +77,18 @@ class SlovakDictionaryService:
             pass
 
     def translate_deeplx(self, text: str) -> Optional[str]:
+        # Швидка перевірка доступності DeepLX порту без блокування (0.05s)
+        import socket
+        try:
+            s = socket.socket()
+            s.settimeout(0.05)
+            if s.connect_ex(('127.0.0.1', 1188)) != 0:
+                s.close()
+                return None
+            s.close()
+        except Exception:
+            return None
+
         endpoint = self.config.get("deeplx_endpoint", "http://127.0.0.1:1188/translate")
         payload = {
             "text": text,
@@ -84,7 +96,7 @@ class SlovakDictionaryService:
             "target_lang": "UK"
         }
         try:
-            resp = requests.post(endpoint, json=payload, timeout=2.0)
+            resp = requests.post(endpoint, json=payload, timeout=1.0)
             if resp.status_code == 200:
                 data = resp.json()
                 if "data" in data and data["data"]:

@@ -13,6 +13,7 @@
 | **Хмара та Завантажувач** | `aiohttp`, `telethon` (Telegram MTProto client) | Завантаження розділів манхви з каналів Telegram та стрімінг із хмарного індексу |
 | **Системні перехоплювачі** | `keyboard`, `pyperclip`, `pywin32` | Глобальні системні гарячі клавіші (Windows LL hooks), робота з буфером обміну, системні атрибути вікон |
 | **Аудіо (Вимова)** | `edge-tts` (Microsoft Azure Neural) + `winmm` MCI API / `winsound` | Студійний нейронний синтез мовлення (SK ViktoriaNeural) з регулюванням швидкості та фоновим програванням без підвисання UI |
+| **Атмосферний звук (Sound Engine)** | `PyQt6.QtMultimedia` (`QMediaPlayer`, `QAudioOutput`) | Двоканальне апаратне відтворення ембієнту (Player A/B з кросфейдом 1.2 с) та SFX ефектів |
 
 ---
 
@@ -25,18 +26,20 @@
 │  slovak_translator/main.py (Slovak Novel)      │  novel_batch_translator/novel_batch...│
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             │
-           ┌────────────────────────────────┼────────────────────────────────┐
-           ▼                                ▼                                ▼
+            ┌────────────────────────────────┼────────────────────────────────┐
+            ▼                                ▼                                ▼
 ┌───────────────────────────────┐ ┌─────────────────────────────────┐ ┌────────────────────────────────┐
 │ МОДУЛЬ ОВЕРЛЕЮ (M_Translate)  │ │      МОДУЛЬ ЧИТАЛКИ (MANHWA)    │ │ СЛОВАЦЬКИЙ ПЕРЕКЛАДАЧ (SK-UK)  │
+│      [ПУБЛІЧНИЙ РЕЛІЗ]        │ │      [ПУБЛІЧНИЙ РЕЛІЗ]          │ │ ⚠️ [ПРИВАТНА УТИЛІТА ДЕВЕЛОПЕРА]│
 ├───────────────────────────────┤ ├─────────────────────────────────┤ ├────────────────────────────────┤
 │ • MascotBadge / ChibiMascot   │ │ • Reader Window (PyQt6 Scroll)  │ │ • Frameless Cloud Window (QSS) │
 │ • BubbleWindow (Comic Frame)  │ │ • Webtoon Strip Layout          │ │ • Alt+W Live Text Capture      │
 │ • SnippingOverlay (RapidOCR)  │ │ • PDF / Image Tile Renderer     │ │ • Edge Neural TTS (Viktoria)   │
-│ • PanelCropper (Кадрування)   │ │ • Novel Reader (`novel_reader`) │ │ • IPA Phonetic Transcription   │
-│ • AnkiCardDialog (Арт 16:10)  │ │ • Cloud Stream Client           │ │ • Text-only Anki Cards         │
-│ • AIChatWindow (Gemini)       │ │ • Telegram Downloader + Dedup   │ │ • Gemini Fast Assistant        │
-│ • HistoryWindow (Словник)     │ │ • Zen Mode / Fullscreen (F11/H) │ │ • Isolated SQLite Cache        │
+│ • PanelCropper (Кадрування)   │ │ • Sound Engine (Ambient/SFX)    │ │ • IPA Phonetic Transcription   │
+│ • AnkiCardDialog (Арт 16:10)  │ │ • AI Sound Analyzer (PDF Gemini)│ │ • Text-only Anki Cards         │
+│ • AIChatWindow (Gemini)       │ │ • Novel Reader (`novel_reader`) │ │ • Gemini Fast Assistant        │
+│ • HistoryWindow (Словник)     │ │ • ⚠️ TG Downloader & Dedup      │ │ • Isolated SQLite Cache        │
+│                               │ │ • ⚠️ Sound Studio (Звукомікшер) │ │ • ⚠️ Batch Translator (CLI)    │
 └───────────────────────────────┘ └─────────────────────────────────┘ └────────────────────────────────┘
                    │
                    ▼

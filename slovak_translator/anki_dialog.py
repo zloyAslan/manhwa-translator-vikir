@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QTimer, QThread
 from PyQt6.QtGui import QFont, QColor, QCursor
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
@@ -8,6 +8,38 @@ from PyQt6.QtWidgets import (
 from anki_service import SlovakAnkiService
 from config import config
 
+class SlovakAnkiCheckWorker(QThread):
+    status_ready = pyqtSignal(bool, int, str)
+
+    def __init__(self, anki_service: SlovakAnkiService):
+        super().__init__()
+        self.anki_service = anki_service
+
+    def run(self):
+        connected = self.anki_service.is_connected()
+        port = config.get("anki_port", 8766)
+        deck = self.anki_service.deck_name
+        self.status_ready.emit(connected, port, deck)
+
+
+class SlovakAnkiSaveWorker(QThread):
+    finished_signal = pyqtSignal(bool, str, str)  # success, word, message
+
+    def __init__(self, anki_service: SlovakAnkiService, word: str, trans: str, sentence: str):
+        super().__init__()
+        self.anki_service = anki_service
+        self.word = word
+        self.trans = trans
+        self.sentence = sentence
+
+    def run(self):
+        try:
+            self.anki_service.add_card(self.word, self.trans, self.sentence)
+            self.finished_signal.emit(True, self.word, "✓ Успішно збережено в Anki!")
+        except Exception as e:
+            self.finished_signal.emit(False, self.word, f"Помилка: {e}")
+
+
 class SlovakAnkiDialog(QWidget):
     card_saved_signal = pyqtSignal(str)
 
@@ -15,6 +47,8 @@ class SlovakAnkiDialog(QWidget):
         super().__init__(parent)
         self.anki_service = anki_service
         self.drag_start_pos = None
+        self._check_worker = None
+        self._save_worker = None
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -146,7 +180,7 @@ class SlovakAnkiDialog(QWidget):
         layout.addLayout(sent_header)
 
         self.sent_edit = QTextEdit()
-        self.sent_edit.setFont(QFont("Segoe UI", 9, italic=True))
+        self.sent_edit.setFont(QFont("Segoe UI", 10))
         self.sent_edit.setFixedHeight(75)
         self.sent_edit.setPlaceholderText("Виділіть речення в тексті новели та натисніть Alt+W...")
         self.sent_edit.setStyleSheet("""
@@ -154,8 +188,10 @@ class SlovakAnkiDialog(QWidget):
                 background-color: #121622;
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 8px;
-                padding: 6px;
-                color: #CBD5E1;
+                padding: 8px;
+                color: #F1F5F9;
+                font-size: 13px;
+                line-height: 1.4;
             }
             QTextEdit:focus {
                 border-color: #2DD4BF;
@@ -190,7 +226,8 @@ class SlovakAnkiDialog(QWidget):
         self.status_lbl = QLabel("")
         self.status_lbl.setFont(QFont("Segoe UI Black", 9))
         self.status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_lbl.setStyleSheet("color: #10B981; border: none;")
+        self.status_lbl.setWordWrap(True)
+        self.status_lbl.setStyleSheet("color: #10B981; border: none; padding: 4px;")
         self.status_lbl.hide()
         layout.addWidget(self.status_lbl)
 
@@ -246,9 +283,20 @@ class SlovakAnkiDialog(QWidget):
         self.update_connection_status()
 
     def update_connection_status(self):
-        connected = self.anki_service.is_connected()
-        port = config.get("anki_port", 8766)
-        deck = self.anki_service.deck_name
+        self.conn_banner.setText("⏳ Перевірка підключення до Anki...")
+        self.conn_banner.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(148, 163, 184, 0.12);
+                color: #94A3B8;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+                border-radius: 6px;
+            }
+        """)
+        self._check_worker = SlovakAnkiCheckWorker(self.anki_service)
+        self._check_worker.status_ready.connect(self._on_connection_status_ready)
+        self._check_worker.start()
+
+    def _on_connection_status_ready(self, connected: bool, port: int, deck: str):
         if connected:
             self.conn_banner.setText(f"✓ AnkiConnect підключено (порт {port}) • Колода '{deck}'")
             self.conn_banner.setStyleSheet("""
@@ -278,6 +326,7 @@ class SlovakAnkiDialog(QWidget):
 
     def set_sentence(self, sentence: str):
         self.sent_edit.setPlainText(sentence)
+        self.status_lbl.hide()
         self.show()
         self.raise_()
         self.activateWindow()
@@ -312,15 +361,33 @@ class SlovakAnkiDialog(QWidget):
             self.status_lbl.show()
             return
 
-        try:
-            self.anki_service.add_card(word, trans, sentence)
-            self.status_lbl.setText("✓ Успішно збережено в Anki!")
+        self.btn_save.setEnabled(False)
+        self.btn_save.setText("⏳ Збереження в Anki...")
+        self.status_lbl.setText("Зберігаємо картку...")
+        self.status_lbl.setStyleSheet("color: #F59E0B; border: none;")
+        self.status_lbl.show()
+
+        self._save_worker = SlovakAnkiSaveWorker(self.anki_service, word, trans, sentence)
+        self._save_worker.finished_signal.connect(self._on_card_saved_result)
+        self._save_worker.start()
+
+    def _on_card_saved_result(self, success: bool, word: str, message: str):
+        deck = self.anki_service.deck_name
+        self.btn_save.setEnabled(True)
+        self.btn_save.setText(f"💾 Додати картку в Anki ({deck})")
+
+        if success:
+            self.status_lbl.setText(message)
             self.status_lbl.setStyleSheet("color: #10B981; border: none;")
             self.status_lbl.show()
             self.card_saved_signal.emit(word)
+            # Очищуємо поля щоб при наступному виклику не залишались старі контексти
+            self.sent_edit.clear()
+            self.word_edit.clear()
+            self.trans_edit.clear()
             QTimer.singleShot(1200, self.hide)
-        except Exception as e:
-            self.status_lbl.setText(f"Помилка: {e}")
+        else:
+            self.status_lbl.setText(message)
             self.status_lbl.setStyleSheet("color: #EF4444; border: none;")
             self.status_lbl.show()
 

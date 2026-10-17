@@ -14,6 +14,14 @@ manhwa_reader/.temp_downloads/
 *.zip
 *.exe
 config.json
+manhwa_reader/config.json
+slovak_translator/config.json
 *.session
 *.session-journal
 *.db
+SECRETS_VAULT*.py
+build_executables.py
+build/
+dist/
+exe_programs/
+backups/

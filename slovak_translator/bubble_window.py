@@ -324,6 +324,12 @@ class SlovakBubbleWindow(QWidget):
         self.status_lbl.setText(f"Перекладаю '{query}'...")
         self.status_lbl.show()
 
+        if self.active_lookup_thread and self.active_lookup_thread.isRunning():
+            try:
+                self.active_lookup_thread.disconnect()
+            except Exception:
+                pass
+
         self.active_lookup_thread = SlovakLookupThread(self.dict_service, query)
         self.active_lookup_thread.result_ready.connect(self.display_results)
         self.active_lookup_thread.start()
