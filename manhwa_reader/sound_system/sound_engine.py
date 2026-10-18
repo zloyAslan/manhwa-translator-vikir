@@ -33,11 +33,11 @@ class SoundEngine(QObject):
         self.ui_dir = self.sounds_dir / "ui"
         self.my_sounds_dir = self.sounds_dir / "my_sounds"
 
-        # Ensure directory structure exists
-        self.ambient_dir.mkdir(parents=True, exist_ok=True)
-        self.sfx_dir.mkdir(parents=True, exist_ok=True)
-        self.ui_dir.mkdir(parents=True, exist_ok=True)
-        self.my_sounds_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure modular sound structure exists without recreating deleted legacy folders
+        (self.sounds_dir / "my_sounds").mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "core").mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "packs").mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "meme").mkdir(parents=True, exist_ok=True)
 
         self.is_enabled = False
         self.master_volume = 0.5  # 0.0 to 1.0
@@ -53,6 +53,10 @@ class SoundEngine(QObject):
         self.last_scroll_fraction: int = 0
         self.last_sfx_page: int = -99
         self.last_sfx_name: str = ""
+
+        # Smart Audio Buffer Cache (Sliding Window lookahead preloading)
+        self.cached_audio_urls: Dict[str, QUrl] = {}
+        self.cached_file_paths: Dict[str, Path] = {}
 
         # Relative volumes for layers (0.0 to 1.0)
         self.bg_target_vol: float = 0.35
@@ -173,10 +177,10 @@ class SoundEngine(QObject):
         self.sfx_dir = self.sounds_dir / "sfx"
         self.ui_dir = self.sounds_dir / "ui"
         self.my_sounds_dir = self.sounds_dir / "my_sounds"
-        self.ambient_dir.mkdir(parents=True, exist_ok=True)
-        self.sfx_dir.mkdir(parents=True, exist_ok=True)
-        self.ui_dir.mkdir(parents=True, exist_ok=True)
-        self.my_sounds_dir.mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "my_sounds").mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "core").mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "packs").mkdir(parents=True, exist_ok=True)
+        (self.sounds_dir / "meme").mkdir(parents=True, exist_ok=True)
         self.recipes_file = self.sounds_dir / "sound_recipes.json"
         self.reload_recipes()
 
@@ -221,10 +225,113 @@ class SoundEngine(QObject):
                 p.stop()
             self.sfx_loop_player.stop()
 
+    def update_audio_precache(self, current_page: int, lookahead_pages: int = 4):
+        """
+        Sliding-window lookahead sound cache:
+        1. Preloads audio tracks (SFX, ambient, BG) required for current_page .. current_page + lookahead_pages.
+        2. Evicts sounds that have already passed, UNLESS they reappear in future pages of the chapter.
+        """
+        if not self.active_timeline:
+            self.cached_audio_urls.clear()
+            self.cached_file_paths.clear()
+            return
+
+        needed_tokens: set[str] = set()
+        future_tokens: set[str] = set()
+
+        for cue in self.active_timeline:
+            cp = cue.get("p", 1)
+            # Gather tokens for this cue
+            tokens = []
+            if cue.get("bg"):
+                tokens.append(cue.get("bg"))
+            if cue.get("amb"):
+                tokens.append(cue.get("amb"))
+            sfx = cue.get("sfx") or cue.get("s", "")
+            if sfx and sfx not in ["none", "silence"]:
+                tokens.extend([t.strip() for t in str(sfx).split(",") if t.strip() and t.strip().lower() not in ["none", "silence"]])
+
+            # If within active lookahead window
+            if current_page <= cp <= (current_page + lookahead_pages):
+                needed_tokens.update(tokens)
+            # If anywhere in the future of the chapter
+            if cp >= current_page:
+                future_tokens.update(tokens)
+
+        # 1. Preload needed sounds into cache
+        for token in needed_tokens:
+            if token not in self.cached_audio_urls and token not in ["none", "silence"]:
+                audio_path = self._resolve_any_sound_file(token)
+                if audio_path and audio_path.exists():
+                    self.cached_file_paths[token] = audio_path
+                    self.cached_audio_urls[token] = QUrl.fromLocalFile(str(audio_path))
+
+        # 2. Smart eviction: only delete if NOT used anywhere in future pages
+        evict_keys = [k for k in self.cached_audio_urls if k not in future_tokens and k != self.current_bg and k != self.current_amb]
+        for k in evict_keys:
+            self.cached_audio_urls.pop(k, None)
+            self.cached_file_paths.pop(k, None)
+
+    def set_setting_pack(self, pack_name: Optional[str]):
+        """Sets the active setting pack for preferred audio resolution."""
+        self.active_setting_pack = pack_name
+
+    def _resolve_any_sound_file(self, token: str, category_hint: Optional[str] = None) -> Optional[Path]:
+        """
+        Resolves audio file searching modular sound architecture:
+        1. Specific setting pack (sounds/packs/<active_setting_pack>/...) if set.
+        2. All packs (sounds/packs/*)
+        3. Core universal sounds (sounds/core/...)
+        4. Meme / neutral effects (sounds/meme/...)
+        5. User custom sounds (sounds/my_sounds/...)
+        6. Legacy flat folders (ambient, sfx, ui) if present.
+        """
+        if not token or token in ["none", "silence"]:
+            return None
+
+        # A. Priority 1: Check active setting pack first
+        packs_dir = self.sounds_dir / "packs"
+        if getattr(self, "active_setting_pack", None) and packs_dir.exists():
+            pack_dir = packs_dir / self.active_setting_pack
+            if pack_dir.exists():
+                f = self._find_audio_file(pack_dir, token)
+                if f:
+                    return f
+
+        # B. Priority 2: Check all packs
+        if packs_dir.exists():
+            f = self._find_audio_file(packs_dir, token)
+            if f:
+                return f
+
+        # C. Priority 3: Check CORE universal library
+        core_dir = self.sounds_dir / "core"
+        if core_dir.exists():
+            f = self._find_audio_file(core_dir, token)
+            if f:
+                return f
+
+        # D. Priority 4: Check MEME folder
+        meme_dir = self.sounds_dir / "meme"
+        if meme_dir.exists():
+            f = self._find_audio_file(meme_dir, token)
+            if f:
+                return f
+
+        # E. Priority 5: User & Legacy directories
+        for directory in [self.my_sounds_dir, self.sfx_dir, self.ambient_dir, self.ui_dir]:
+            if directory.exists():
+                f = self._find_audio_file(directory, token)
+                if f:
+                    return f
+
+        return None
+
     def set_timeline(self, timeline: List[Dict[str, Any]]):
         """Loads timeline cues for the currently active chapter and starts layers."""
         self.active_timeline = sorted(timeline, key=lambda x: (x.get("p", 1), x.get("f", 0)))
         self.last_triggered_key = ""
+        self.update_audio_precache(self.last_scroll_page)
         if self.active_timeline and self.is_enabled and not self.is_loading_chapter:
             self.on_scroll_position(self.last_scroll_page, self.last_scroll_fraction)
 
@@ -237,6 +344,9 @@ class SoundEngine(QObject):
             return
 
         page_delta = abs(page - self.last_scroll_page)
+        # Update audio buffer cache when page changes
+        if page != self.last_scroll_page:
+            self.update_audio_precache(page)
         self.last_scroll_page = page
         self.last_scroll_fraction = fraction
 
@@ -351,7 +461,9 @@ class SoundEngine(QObject):
         if track_name == self.current_bg:
             return
 
-        audio_file = self._find_audio_file(self.ui_dir, track_name)
+        audio_file = self._resolve_any_sound_file(track_name)
+        if not audio_file:
+            audio_file = self._find_audio_file(self.ui_dir, track_name)
         if not audio_file:
             audio_file = self._find_audio_file(self.my_sounds_dir, track_name)
         if not audio_file:
@@ -441,7 +553,9 @@ class SoundEngine(QObject):
         if track_name == self.current_amb:
             return
 
-        audio_file = self._find_audio_file(self.ambient_dir, track_name)
+        audio_file = self._resolve_any_sound_file(track_name)
+        if not audio_file:
+            audio_file = self._find_audio_file(self.ambient_dir, track_name)
         if not audio_file:
             audio_file = self._find_audio_file(self.my_sounds_dir, track_name)
         if not audio_file:
@@ -535,15 +649,14 @@ class SoundEngine(QObject):
             return
 
         for token in tokens:
-            audio_file = self._find_audio_file(self.sfx_dir, token)
-            if not audio_file:
-                audio_file = self._find_audio_file(self.ambient_dir, token)
-            if not audio_file:
-                audio_file = self._find_audio_file(self.my_sounds_dir, token)
-            if not audio_file:
-                audio_file = self._find_audio_file(self.ui_dir, token)
+            # 1. Use preloaded cached URL if present (instant 0ms RAM access)
+            audio_url = self.cached_audio_urls.get(token)
+            if not audio_url:
+                audio_file = self._resolve_any_sound_file(token)
+                if audio_file:
+                    audio_url = QUrl.fromLocalFile(str(audio_file))
 
-            if not audio_file:
+            if not audio_url:
                 logger.debug(f"[SoundEngine] SFX '{token}' requested (not found)")
                 continue
 
@@ -553,7 +666,7 @@ class SoundEngine(QObject):
             self.sfx_player_idx = (self.sfx_player_idx + 1) % len(self.sfx_players)
 
             out.setVolume(self.master_volume * volume_scale)
-            player.setSource(QUrl.fromLocalFile(str(audio_file)))
+            player.setSource(audio_url)
             player.play()
 
     def play_sfx_loop(self, sfx_name: str, volume_scale: float = 0.75):
@@ -562,7 +675,9 @@ class SoundEngine(QObject):
         if sfx_name == self.current_sfx_loop:
             return
 
-        audio_file = self._find_audio_file(self.sfx_dir, sfx_name)
+        audio_file = self._resolve_any_sound_file(sfx_name)
+        if not audio_file:
+            audio_file = self._find_audio_file(self.sfx_dir, sfx_name)
         if not audio_file:
             audio_file = self._find_audio_file(self.ambient_dir, sfx_name)
         if not audio_file:
@@ -704,13 +819,12 @@ class SoundEngine(QObject):
                 if cand.exists():
                     return cand
 
-            # D. Dynamic loose match (strict: target name must be contained in file name, min 5 chars)
+            # D. Dynamic recursive search (exact stem match or contained substring)
             clean_cand = cand_name.lower().replace("_", "").replace("-", "")
-            if len(clean_cand) >= 5:
-                for f in directory.glob("*.*"):
-                    if f.suffix.lower() in [".mp3", ".ogg", ".wav"]:
-                        clean_stem = f.stem.lower().replace("_", "").replace("-", "")
-                        if clean_cand == clean_stem or clean_cand in clean_stem:
-                            return f
+            for f in directory.rglob("*"):
+                if f.is_file() and f.suffix.lower() in [".mp3", ".ogg", ".wav"]:
+                    clean_stem = f.stem.lower().replace("_", "").replace("-", "")
+                    if clean_cand == clean_stem or (len(clean_cand) >= 4 and clean_cand in clean_stem):
+                        return f
 
         return None

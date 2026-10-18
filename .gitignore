@@ -9,6 +9,7 @@ anki_decks/*.jpg
 # Manhwa Reader ignores
 manhwa_reader/__pycache__/
 manhwa_reader/library/
+manhwa_reader/sounds/
 manhwa_reader/*.session
 manhwa_reader/.temp_downloads/
 *.zip

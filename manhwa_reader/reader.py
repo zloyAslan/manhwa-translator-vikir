@@ -25,6 +25,8 @@ if _PROJECT_ROOT not in sys.path:
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
+import logging
+logger = logging.getLogger("manhwa_reader")
 import re
 import json
 import asyncio
@@ -43,8 +45,9 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QScrollArea, QSlider, QComboBox, QLineEdit,
     QProgressBar, QTextEdit, QDialog, QFrame, QSizePolicy, QStackedWidget,
-    QCheckBox
+    QCheckBox, QTreeWidget, QTreeWidgetItem
 )
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 try:
     import pymupdf as fitz
@@ -85,19 +88,21 @@ except ImportError:
             NovelReaderWindow = None
 
 try:
-    from manhwa_reader.sound_system import SoundEngine, AISoundAnalyzer, SoundStudioWindow
+    from manhwa_reader.sound_system import SoundEngine, AISoundAnalyzer, SoundStudioWindow, TitleClassifier
 except ImportError:
     try:
-        from sound_system import SoundEngine, AISoundAnalyzer, SoundStudioWindow
+        from sound_system import SoundEngine, AISoundAnalyzer, SoundStudioWindow, TitleClassifier
     except ImportError:
         try:
-            from manhwa_reader.sound_engine import SoundEngine
-            from manhwa_reader.ai_sound_analyzer import AISoundAnalyzer
+            from manhwa_reader.sound_system.sound_engine import SoundEngine
+            from manhwa_reader.sound_system.ai_sound_analyzer import AISoundAnalyzer
+            from manhwa_reader.sound_system.title_classifier import TitleClassifier
             SoundStudioWindow = None
         except ImportError:
             SoundEngine = None
             AISoundAnalyzer = None
             SoundStudioWindow = None
+            TitleClassifier = None
 
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent.resolve()
@@ -150,590 +155,14 @@ def _load_internal_credentials():
 INTERNAL_TG_API_ID, INTERNAL_TG_API_HASH, INTERNAL_TG_BOT_TOKEN, INTERNAL_VAULT_INVITE, INTERNAL_VAULT_CHANNEL_ID, INTERNAL_VAULT_CHANNEL_TITLE = _load_internal_credentials()
 DEFAULT_BOT_TOKEN = INTERNAL_TG_BOT_TOKEN
 
-# Multilingual Translations
-# ---------------------------------------------------------------------------
-TRANSLATIONS = {
-    "en": {
-        "app_title": "Manhwa Reader AI Drafter",
-        "tab_catalog": "📚 Library",
-        "tab_reader": "📖 Reader",
-        "tab_downloader": "⚡ TG Downloader",
-        "tab_settings": "⚙️ Settings",
-        "badge_engine": "🚀 STANDALONE WEBTOON ENGINE",
-        "subtitle": "Standalone webtoon player, auto-bookmarks & high-speed Telegram downloader",
-        "fs_on": "⛶ Fullscreen (F11)",
-        "fs_off": "🗗 Windowed (F11)",
-        "hide_menu": "Hide Menu (H)",
-        "show_menu": "Show Menu (H)",
-        "to_catalog": "← Library",
-        "lib_title": "Your Library",
-        "refresh": "🔄 Refresh",
-        "add_tg": "+ Download from TG",
-        "empty_lib": "📂 Your library is currently empty.\nHead over to '⚡ TG Downloader' tab to get started!",
-        "read_btn": "▶ Read",
-        "del_tooltip": "Delete manhwa",
-        "del_confirm_title": "Delete Manhwa",
-        "del_confirm_msg": "Are you sure you want to delete:\n«{title}» ?",
-        "del_confirm_sub": "All downloaded chapters, files, and bookmarks will be permanently removed from disk.",
-        "cancel": "Cancel",
-        "del_btn_action": "🗑️ Yes, Delete",
-        "select_manhwa": "Select a manhwa",
-        "prev_ch": "◀ Previous",
-        "next_ch": "Next ▶",
-        "chapter_prefix": "Chapter",
-        "width_lbl": "Width:",
-        "zoom_lbl": "Zoom:",
-        "theme_lbl": "Theme:",
-        "dl_title": "⚡ Telegram PDF Chapter Downloader",
-        "dl_info_title": "📌 How Downloader Works:",
-        "dl_info_desc": "Provide an open channel link (e.g., https://t.me/channel_name) or username (@channel_name). The app will search for PDF files and save them to your library.",
-        "dl_channel": "Channel (URL or @tag):",
-        "dl_channel_ph": "https://t.me/channel_name or @channel_name",
-        "dl_search": "Search Keyword (Filter):",
-        "dl_search_ph": "e.g.: Title (or leave empty for all PDFs)",
-        "dl_range": "Chapter Number or Range:",
-        "dl_range_ph": "e.g.: 2 or 1-30 or 1 2 (empty = all)",
-        "dl_name": "Title Name in Library:",
-        "dl_name_ph": "Folder name for manhwa in library",
-        "dl_lang": "Translation Language:",
-        "dl_lang_auto": "Auto-detect",
-        "dl_start": "🚀 Start Download",
-        "settings_title": "⚙️ Application Settings",
-        "lang_lbl": "Interface Language:",
-        "speed_lbl": "Keyboard Scroll Speed:",
-        "lib_lbl": "Library Folder:",
-        "sounds_lbl": "Sounds & Foley Folder:",
-        "browse_btn": "Browse...",
-        "select_lib_folder": "Select Library Folder",
-        "select_sounds_folder": "Select Sounds & Audio Packs Folder",
-        "save_btn": "💾 Save Settings",
-        "saved_msg": "Settings saved successfully!",
-        "auth_btn": "🤖 Bot Token",
-        "auth_ok": "🟢 Telegram Bot Connected",
-        "auth_needed": "🟡 Telegram Bot Token Required",
-        "toggle_extract_jpeg_title": "Extract to JPEG upon Download",
-        "toggle_extract_jpeg_sub": "Converts PDF files into image galleries during download",
-        "toggle_novel_mode_title": "Novel / Light Novel (EPUB / DOCX / TXT)",
-        "toggle_novel_mode_sub": "Save as text novel chapters into dedicated Novel Library",
-        "cat_tab_novels": "📖 Novels / Light Novels",
-        "toggle_del_pdf_title": "Delete Original PDF After Extraction",
-        "toggle_del_pdf_sub": "Saves disk space after creating JPEG galleries",
-        "read_in_jpeg": "Read in JPEG",
-        "read_in_pdf": "Read in PDF",
-        "manual_unpack_title": "📦 Manual Chapter Unpack (PDF → JPEG)",
-        "manual_unpack_sub": "Select manhwa and chapter from existing PDFs to convert into JPEG:",
-        "manual_unpack_m_lbl": "Manhwa:",
-        "manual_unpack_ch_lbl": "Chapter to Unpack:",
-        "manual_unpack_btn": "⚡ Unpack Selected Chapter to JPEG",
-        "status_only_pdf": "Only PDF",
-        "status_has_jpeg": "Already JPEG",
-        "status_no_pdf": "No PDF Chapters Available",
-        "status_empty_m": "No manhwa in library",
-        "unpack_confirm_title": "Unpack JPEG",
-        "unpack_confirm_header": "⚡ Unpack Chapter {ch} to JPEG",
-        "unpack_confirm_msg": "JPEG pages for this chapter are not unpacked yet.\nWould you like to unpack them from the existing PDF now?",
-        "unpack_confirm_btn": "⚡ Unpack to JPEG",
-        "pdf_missing_title": "PDF Unavailable",
-        "pdf_missing_msg": "Original PDF file for chapter {ch} was deleted after extraction or is missing.",
-        "token_dlg_title": "Telegram Bot Setup",
-        "token_dlg_header": "🤖 Telegram Bot Token for Downloads",
-        "token_dlg_info": "The bot allows downloading chapters without phone numbers, SMS, or 2FA passwords.\nPaste your bot token from @BotFather here. It will be saved in config.json.",
-        "token_dlg_lbl": "API Bot Token:",
-        "token_dlg_ph": "e.g.: 8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA",
-        "token_save_btn": "💾 Save Token",
-        "token_saved_msg": "Token saved successfully in config.json!",
-        "token_ready_log": "🟢 Telegram Bot connected! Ready to download chapters.",
-        "ok_btn": "Got it",
-        "unpacking_progress": "Unpacking chapter {num}...",
-        "unpacking_success": "✓ Chapter {num} unpacked successfully ({count} pages)!",
-        "unpacking_error": "Unpack error: {err}",
-        "select_pdf_first": "Please select a chapter with an existing PDF!",
-        "dl_err_no_channel": "Error: please enter a channel link!",
-        "dl_start_log": "Search and download for: «{title}» (Chapters: {range})...",
-        "dl_all": "all",
-        "log_success_tag": "[SUCCESS]",
-        "log_error_tag": "[ERROR]",
-        "dl_log_connecting": "Connecting to Telegram service via Bot...",
-        "dl_log_searching": "Searching for PDF chapters in @{channel}...",
-        "dl_log_found_count": "Found chapters/documents: {count}",
-        "dl_log_total_to_download": "Will download chapters: {count}. Starting...",
-        "dl_log_chapter_header": "[{idx}/{total}] Chapter {ch}: {filename}",
-        "dl_log_downloading": "Downloading {filename} ({size} MB)...",
-        "dl_log_downloaded": "Chapter {ch} downloaded! Parallel JPEG extraction started...",
-        "dl_log_extracting": "Extracting pages for Chapter {ch}...",
-        "dl_log_extract_done": "✓ Chapter {ch}: JPEG extraction complete.",
-        "dl_log_saved_pdf": "Saved as PDF: Chapter {ch}",
-        "dl_log_waiting_extract": "Waiting for background extraction tasks to complete...",
-        "dl_log_done": "Download of «{title}» finished successfully!",
-        "dl_already_exists_title": "Chapter Already Downloaded",
-        "dl_already_exists_msg": "The following chapter(s) are already downloaded:\n{chapters}\n\nDo you want to re-download them?",
-        "dl_already_exists_redownload": "⚡ Download Again",
-        "dl_already_exists_skip": "Skip Existing",
-        "dl_already_exists_cancel": "Cancel",
-        "dl_log_skipped_exists": "Chapter {ch} already exists. Skipping.",
-        "cat_tab_local": "📚 Local Library",
-        "cat_tab_cloud": "☁️ Cloud Vault",
-        "cloud_vault_title": "Cloud Vault",
-        "cloud_stream_read": "⚡ Read Online",
-        "cloud_empty": "☁️ No titles found in your cloud vault.",
-        "cloud_sync_btn": "🔄 Refresh",
-        "cloud_badge": "CLOUD",
-        "cloud_status_streaming": "⚡ Streaming in RAM (0 bytes on disk)",
-        "cloud_card_dl_btn": "📥 Download",
-        "cloud_card_dl_tooltip": "Download PDF to local library",
-        "cloud_card_chs_word": "chapters",
-        "cloud_card_new": "New",
-        "cloud_dl_dlg_title": "Download PDF",
-        "cloud_dl_dlg_header": "📥 Download Chapter (PDF)",
-        "cloud_dl_total_range": "Total chapters available in vault: {min_ch}–{max_ch} (total {total})",
-        "cloud_dl_total_count": "Total chapters available in vault: {total}",
-        "cloud_dl_folder_lbl": "Save destination (folder name in Library):",
-        "cloud_dl_range_lbl": "Chapter number or range:",
-        "cloud_dl_range_ph": "e.g.: 1 or 1-10 or 1 2 3",
-        "cloud_dl_btn": "📥 Download PDF",
-        "reader_cloud_dl_btn": "📥 Download PDF",
-        "notice_dl_success_title": "Download Complete",
-        "notice_dl_success_btn": "Great",
-        "notice_dl_error_title": "Download Error",
-        "notice_dl_error_btn": "Got it",
-        "cloud_dl_no_chapters": "No chapters found matching filter '{range}'.",
-        "cloud_dl_start_status": "📥 Started downloading {total} chapters to library «{folder}»...",
-        "cloud_dl_chapter_status": "[{idx}/{total}] Downloading Chapter {ch}...",
-        "cloud_dl_saved_pdf": "✓ Chapter {ch} saved as PDF.",
-        "cloud_dl_finish_success": "Successfully downloaded {total} chapters of manhwa «{folder}»!",
-        "search_ph": "🔍 Search titles...",
-        "filter_lang_all": "All Languages",
-        "filter_lang_ua": "🇺🇦 UA",
-        "filter_lang_en": "🇬🇧 EN",
-        "filter_lang_ru": "🇷🇺 RU",
-        "filter_lang_raw": "🌐 RAW / Other",
-        "filter_prog_all": "All Progress",
-        "filter_prog_reading": "📖 Reading",
-        "filter_prog_completed": "✅ Read",
-        "filter_prog_unread": "⏳ Unread",
-        "search_count_lbl": "Showing: {count}",
-        "btn_translate_nav": "⚔️ Translate",
-        "translate_not_found_title": "M_Translate Module Not Found!",
-        "translate_not_found_msg": "You do not have the Translate module installed. Visit our official Telegram channel to download the full version of the application.",
-        "telegram_open_btn": "✈️ Open Telegram Channel",
-        "other_translations_avail": "🌐 Available translations:",
-        "switch_trans_tip": "Switch to {lang} version: {title}",
-        "music_card_title": "🎵 Background Ambient & Effects (Beta 🛠️🚧)",
-        "music_card_sub": "Atmospheric sound design tailored for webtoon and novel immersion:",
-        "music_enable_lbl": "Enable Ambient Atmosphere:",
-        "music_preset_lbl": "Atmospheric Preset:",
-        "music_vol_lbl": "Music & Effects Volume:",
-        "music_preset_dungeon": "⚔️ Dark Dungeon & Caverns",
-        "music_preset_rain": "🌧️ Night Rain & Soft Wind",
-        "music_preset_library": "📚 Ancient Archives (Paper & Quill)",
-        "music_preset_cyber": "🌆 Cyberpunk / Modern Fantasy",
-        "music_beta_notice": "🛠️ Sound engine is currently in Beta test mode. Presets and AI-adaptive soundtrack are being calibrated.",
-        "gemini_key_lbl": "Google Gemini API Key:",
-        "gemini_key_ph": "Enter Gemini API Key...",
-        "show_key_tip": "Show / Hide Key",
-        "gemini_status_configured": "🟢 Gemini API Key configured",
-        "gemini_status_none": "⚪ Key not set (default ambients will be used)",
-        "preload_section_title": "Chapter Preload & Endless Scroll",
-        "preload_mode_lbl": "Next Chapter Preload Mode:",
-        "preload_adaptive": "Adaptive",
-        "preload_manual": "Fixed Percentage",
-        "preload_disabled": "Disabled",
-        "preload_threshold_lbl": "Trigger Preload at Chapter %:",
-        "progress_display_lbl": "Library Progress Display:",
-        "progress_mode_chapter": "Current Chapter Percentage",
-        "progress_mode_overall": "Total Title Percentage",
-        "music_preset_ai_adaptive": "AI-Adaptive Soundtrack",
-        "music_preset_my_sounds": "[My Tracks] {name}",
-        "music_preset_ui": "[Soundtrack] {name}"
-    },
-    "uk": {
-        "app_title": "Manhwa Reader AI Drafter",
-        "tab_catalog": "📚 Бібліотека",
-        "tab_reader": "📖 Читалка",
-        "tab_downloader": "⚡ TG Завантажувач",
-        "tab_settings": "⚙️ Налаштування",
-        "badge_engine": "🚀 STANDALONE WEBTOON ENGINE",
-        "subtitle": "Автономний вебтун-плеєр, автозакладки та швидкий завантажувач із Telegram",
-        "fs_on": "⛶ На весь екран (F11)",
-        "fs_off": "🗗 Згорнути (F11)",
-        "hide_menu": "Приховати меню (H)",
-        "show_menu": "Показати меню (H)",
-        "to_catalog": "← Бібліотека",
-        "lib_title": "Твоя бібліотека",
-        "refresh": "🔄 Оновити",
-        "add_tg": "+ Завантажити з TG",
-        "empty_lib": "📂 У бібліотеці поки порожньо.\nПерейдіть у вкладку '⚡ TG Завантажувач', щоб додати манхву!",
-        "read_btn": "▶ Читати",
-        "del_tooltip": "Видалити манхву",
-        "del_confirm_title": "Видалити манхву",
-        "del_confirm_msg": "Ви дійсно хочете видалити манхву:\n«{title}» ?",
-        "del_confirm_sub": "Усі викачані глави, файли та закладка будуть повністю видалені з диска.",
-        "cancel": "Скасувати",
-        "del_btn_action": "🗑️ Так, видалити",
-        "select_manhwa": "Оберіть манхву",
-        "prev_ch": "◀ Попередня",
-        "next_ch": "Наступна ▶",
-        "chapter_prefix": "Глава",
-        "width_lbl": "Ширина:",
-        "zoom_lbl": "Зум:",
-        "theme_lbl": "Фон:",
-        "dl_title": "⚡ Завантажувач PDF-глав із Telegram",
-        "dl_info_title": "📌 Як працює завантажувач:",
-        "dl_info_desc": "Вкажіть посилання на відкритий канал (наприклад, https://t.me/channel_name) або юзернейм (@channel_name). Програма знайде PDF-документи та збереже їх у бібліотеку манхви.",
-        "dl_channel": "Канал (URL або @тег):",
-        "dl_channel_ph": "https://t.me/channel_name або @channel_name",
-        "dl_search": "Пошукове слово (фільтр):",
-        "dl_search_ph": "Наприклад: Назва (або порожньо для всіх PDF)",
-        "dl_range": "Номер або діапазон (напр. 2 або 1-30):",
-        "dl_range_ph": "Наприклад: 2 або 1-30 або 1 2 (порожньо = всі)",
-        "dl_name": "Назва тайтлу в бібліотеці:",
-        "dl_name_ph": "Назва папки манхви у бібліотеці",
-        "dl_lang": "Мова перекладу тайтлу:",
-        "dl_lang_auto": "Авто-визначення",
-        "dl_start": "🚀 Почати завантаження",
-        "settings_title": "⚙️ Налаштування програми",
-        "lang_lbl": "Мова інтерфейсу:",
-        "speed_lbl": "Швидкість скролу клавішами:",
-        "lib_lbl": "Папка бібліотеки:",
-        "sounds_lbl": "Папка аудіо та фолей (звуків):",
-        "browse_btn": "Огляд...",
-        "select_lib_folder": "Виберіть папку бібліотеки",
-        "select_sounds_folder": "Виберіть папку для аудіо та звукових паків",
-        "save_btn": "💾 Зберегти налаштування",
-        "saved_msg": "Налаштування успішно збережено!",
-        "auth_btn": "🤖 Токен Бота",
-        "auth_ok": "🟢 Telegram Бот підключено",
-        "auth_needed": "🟡 Потрібен токен бота Telegram",
-        "toggle_extract_jpeg_title": "Розпаковувати в JPEG при завантаженні",
-        "toggle_extract_jpeg_sub": "Конвертує PDF-файли у галерею зображень під час скачування",
-        "toggle_novel_mode_title": "Новела / Ранобе (EPUB / DOCX / TXT)",
-        "toggle_novel_mode_sub": "Зберігати глави тексту в окрему Бібліотеку Новел для читання",
-        "cat_tab_novels": "📖 Новели / Ранобе",
-        "toggle_del_pdf_title": "Видаляти оригінальний PDF після розпаковки",
-        "toggle_del_pdf_sub": "Економить місце на диску після створення JPEG-галереї",
-        "read_in_jpeg": "Читати в JPEG",
-        "read_in_pdf": "Читати в PDF",
-        "manual_unpack_title": "📦 Ручне розпакування глав (PDF → JPEG)",
-        "manual_unpack_sub": "Оберіть манхву та главу з наявних PDF для конвертації в JPEG:",
-        "manual_unpack_m_lbl": "Манхва:",
-        "manual_unpack_ch_lbl": "Глава для розпаковки:",
-        "manual_unpack_btn": "⚡ Розпакувати вибрану главу в JPEG",
-        "status_only_pdf": "Тільки PDF",
-        "status_has_jpeg": "Вже є JPEG",
-        "status_no_pdf": "Немає розділів із PDF",
-        "status_empty_m": "У бібліотеці немає манхви",
-        "unpack_confirm_title": "Розпакування JPEG",
-        "unpack_confirm_header": "⚡ Розпакування Глави {ch} в JPEG",
-        "unpack_confirm_msg": "Сторінки JPEG для цієї глави ще не розпаковані.\nРозпакувати зараз із наявного PDF-файлу за нашою технологією?",
-        "unpack_confirm_btn": "⚡ Розпакувати в JPEG",
-        "pdf_missing_title": "PDF недоступний",
-        "pdf_missing_msg": "Оригінальний PDF-файл для глави {ch} було видалено після розпаковки або він відсутній.",
-        "token_dlg_title": "Налаштування Telegram Бота",
-        "token_dlg_header": "🤖 Токен Telegram Бота для завантаження",
-        "token_dlg_info": "Бот дозволяє завантажувати глави без телефонів, SMS та паролів 2FA.\nВставте сюди токен вашого бота з @BotFather. Він збережеться в config.json.",
-        "token_dlg_lbl": "API Токен Бота:",
-        "token_dlg_ph": "Наприклад: 8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA",
-        "token_save_btn": "💾 Зберегти токен",
-        "token_saved_msg": "Токен успішно збережено в config.json!",
-        "token_ready_log": "🟢 Telegram Бот підключено! Можна завантажувати глави.",
-        "ok_btn": "Зрозуміло",
-        "unpacking_progress": "Розпакування глави {num}...",
-        "unpacking_success": "✓ Главу {num} успішно розпаковано ({count} сторінок)!",
-        "unpacking_error": "Помилка розпакування: {err}",
-        "select_pdf_first": "Оберіть главу з наявним PDF!",
-        "dl_err_no_channel": "Помилка: введіть посилання на канал!",
-        "dl_start_log": "Пошук та завантаження для: «{title}» (Глави: {range})...",
-        "dl_all": "всі",
-        "log_success_tag": "[УСПІХ]",
-        "log_error_tag": "[ПОМИЛКА]",
-        "dl_log_connecting": "Підключення до сервісу Telegram через Бота...",
-        "dl_log_searching": "Пошук PDF-глав у каналі @{channel}...",
-        "dl_log_found_count": "Знайдено розділів/файлів: {count}",
-        "dl_log_total_to_download": "Буде завантажено глав: {count}. Розпочинаємо...",
-        "dl_log_chapter_header": "[{idx}/{total}] Глава {ch}: {filename}",
-        "dl_log_downloading": "Завантаження {filename} ({size} MB)...",
-        "dl_log_downloaded": "Глава {ch} завантажена! Паралельна розпаковка в JPEG розпочата...",
-        "dl_log_extracting": "Розпакування сторінок для Глави {ch}...",
-        "dl_log_extract_done": "✓ Глава {ch}: розпаковку в JPEG завершено.",
-        "dl_log_saved_pdf": "Збережено як PDF: Глава {ch}",
-        "dl_log_waiting_extract": "Очікування завершення фонових задач розпаковки...",
-        "dl_log_done": "Завантаження манхви «{title}» успішно завершено!",
-        "dl_already_exists_title": "Главу вже завантажено",
-        "dl_already_exists_msg": "Наступні глави вже існують у бібліотеці:\n{chapters}\n\nБажаєте завантажити їх повторно?",
-        "dl_already_exists_redownload": "⚡ Завантажити повторно",
-        "dl_already_exists_skip": "Пропустити існуючі",
-        "dl_already_exists_cancel": "Скасувати",
-        "dl_log_skipped_exists": "Глава {ch} вже існує. Пропуск.",
-        "cat_tab_local": "📚 Локальна бібліотека",
-        "cat_tab_cloud": "☁️ Хмарне сховище",
-        "cloud_vault_title": "Хмарне сховище",
-        "cloud_stream_read": "⚡ Читати онлайн",
-        "cloud_empty": "☁️ У вашому хмарному сховищі поки немає збережених глав.",
-        "cloud_sync_btn": "🔄 Оновити",
-        "cloud_badge": "ХМАРА",
-        "cloud_status_streaming": "⚡ Стрімінг у RAM (0 байт на диску)",
-        "cloud_card_dl_btn": "📥 Завантажити",
-        "cloud_card_dl_tooltip": "Завантажити PDF у локальну бібліотеку",
-        "cloud_card_chs_word": "глав",
-        "cloud_card_new": "Нова",
-        "cloud_dl_dlg_title": "Завантажити PDF",
-        "cloud_dl_dlg_header": "📥 Завантажити главу (PDF)",
-        "cloud_dl_total_range": "Всього доступно глав у сховищі: {min_ch}–{max_ch} (всього {total})",
-        "cloud_dl_total_count": "Всього доступно глав у сховищі: {total}",
-        "cloud_dl_folder_lbl": "Куди зберегти (назва папки у Library):",
-        "cloud_dl_range_lbl": "Номер або діапазон глав:",
-        "cloud_dl_range_ph": "Наприклад: 1 або 1-10 або 1 2 3",
-        "cloud_dl_btn": "📥 Завантажити PDF",
-        "reader_cloud_dl_btn": "📥 Завантажити PDF",
-        "notice_dl_success_title": "Завантаження завершено",
-        "notice_dl_success_btn": "Чудово",
-        "notice_dl_error_title": "Помилка завантаження",
-        "notice_dl_error_btn": "Зрозуміло",
-        "cloud_dl_no_chapters": "Не знайдено глав за фільтром '{range}'.",
-        "cloud_dl_start_status": "📥 Розпочато завантаження {total} глав у бібліотеку «{folder}»...",
-        "cloud_dl_chapter_status": "[{idx}/{total}] Завантаження Глави {ch}...",
-        "cloud_dl_saved_pdf": "✓ Глава {ch} збережена як PDF.",
-        "cloud_dl_finish_success": "Успішно завантажено {total} глав манхви «{folder}»!",
-        "search_ph": "🔍 Пошук тайтлів...",
-        "filter_lang_all": "Всі мови",
-        "filter_lang_ua": "🇺🇦 UA",
-        "filter_lang_en": "🇬🇧 EN",
-        "filter_lang_ru": "🇷🇺 RU",
-        "filter_lang_raw": "🌐 RAW / Інші",
-        "filter_prog_all": "Весь прогрес",
-        "filter_prog_reading": "📖 Читаю",
-        "filter_prog_completed": "✅ Прочитано",
-        "filter_prog_unread": "⏳ Непочаті",
-        "search_count_lbl": "Знайдено: {count}",
-        "btn_translate_nav": "⚔️ Translate",
-        "translate_not_found_title": "Модуль M_Translate не знайдено!",
-        "translate_not_found_msg": "У вас немає встановленого модуля Translate. Перейдіть до нашого офіційного Telegram-каналу, щоб завантажити повноцінну версію додатку.",
-        "telegram_open_btn": "✈️ Відкрити Telegram-канал",
-        "other_translations_avail": "🌐 Доступні інші переклади:",
-        "switch_trans_tip": "Перейти до {lang} версії: {title}",
-        "music_card_title": "🎵 Фонова музика та атмосфера (Бета 🛠️🚧)",
-        "music_card_sub": "Атмосферний звуковий ембієнт для повного занурення в манхву та новели:",
-        "music_enable_lbl": "Увімкнути фоновий ембієнт:",
-        "music_preset_lbl": "Атмосферний пресет:",
-        "music_vol_lbl": "Гучність музики та ефектів:",
-        "music_preset_dungeon": "⚔️ Темне підземелля та печери",
-        "music_preset_rain": "🌧️ Нічний дощ та легкий вітерець",
-        "music_preset_library": "📚 Стародавній архів (Шелест сторінок)",
-        "music_preset_cyber": "🌆 Кіберпанк / Сучасне фентезі",
-        "music_beta_notice": "🛠️ Звуковий рушій наразі у режимі бета-тестування. Пресети та ШІ-адаптивний саундтрек проходять калібрування.",
-        "gemini_key_lbl": "Ключ Google Gemini API:",
-        "gemini_key_ph": "Введіть Gemini API Key...",
-        "show_key_tip": "Показати / приховати ключ",
-        "gemini_status_configured": "🟢 Gemini API Key налаштовано",
-        "gemini_status_none": "⚪ Ключ не вказано (буде використано базові звуки)",
-        "preload_section_title": "Підвантаження глав та безкінечний скрол",
-        "preload_mode_lbl": "Режим підвантаження наступної глави:",
-        "preload_adaptive": "Адаптивно",
-        "preload_manual": "Фіксований відсоток",
-        "preload_disabled": "Вимкнено",
-        "preload_threshold_lbl": "Поріг підвантаження глави (%):",
-        "progress_display_lbl": "Відображення прогресу в бібліотеці:",
-        "progress_mode_chapter": "Відсоток поточної глави",
-        "progress_mode_overall": "Загальний відсоток від усього тайтлу",
-        "music_preset_ai_adaptive": "ШІ-Адаптивний Саундтрек",
-        "music_preset_my_sounds": "[Мої треки] {name}",
-        "music_preset_ui": "[Саундтрек] {name}"
-    },
-    "ru": {
-        "app_title": "Manhwa Reader AI Drafter",
-        "tab_catalog": "📚 Библиотека",
-        "tab_reader": "📖 Читалка",
-        "tab_downloader": "⚡ TG Загрузчик",
-        "tab_settings": "⚙️ Настройки",
-        "badge_engine": "🚀 STANDALONE WEBTOON ENGINE",
-        "subtitle": "Автономный вебтун-плеер, автозакладки и быстрый загрузчик из Telegram",
-        "fs_on": "⛶ На весь экран (F11)",
-        "fs_off": "🗗 Свернуть (F11)",
-        "hide_menu": "Скрыть меню (H)",
-        "show_menu": "Показать меню (H)",
-        "to_catalog": "← Библиотека",
-        "lib_title": "Твоя библиотека",
-        "refresh": "🔄 Обновить",
-        "add_tg": "+ Загрузить из TG",
-        "empty_lib": "📂 В библиотеке пока пусто.\nПерейдите во вкладку '⚡ TG Загрузчик', чтобы добавить манхву!",
-        "read_btn": "▶ Читать",
-        "del_tooltip": "Удалить манхву",
-        "del_confirm_title": "Удалить манхву",
-        "del_confirm_msg": "Вы действительно хотите удалить манхву:\n«{title}» ?",
-        "del_confirm_sub": "Все скачанные главы, файлы и закладка будут полностью удалены с диска.",
-        "cancel": "Отмена",
-        "del_btn_action": "🗑️ Да, удалить",
-        "select_manhwa": "Выберите манхву",
-        "prev_ch": "◀ Предыдущая",
-        "next_ch": "Следующая ▶",
-        "chapter_prefix": "Глава",
-        "width_lbl": "Ширина:",
-        "zoom_lbl": "Зум:",
-        "theme_lbl": "Фон:",
-        "dl_title": "⚡ Загрузчик PDF-глав из Telegram",
-        "dl_info_title": "📌 Как работает загрузчик:",
-        "dl_info_desc": "Укажите ссылку на открытый канал (например, https://t.me/channel_name) или юзернейм (@channel_name). Программа найдет PDF-документы и сохранит их в библиотеку манхвы.",
-        "dl_channel": "Канал (URL или @тег):",
-        "dl_channel_ph": "https://t.me/channel_name или @channel_name",
-        "dl_search": "Поисковое слово (фильтр):",
-        "dl_search_ph": "Например: Название (или оставьте пустым для всех PDF)",
-        "dl_range": "Номер или диапазон (напр. 2 или 1-30):",
-        "dl_range_ph": "Например: 2 или 1-30 или 1 2 (пусто = все)",
-        "dl_name": "Название тайтла в библиотеке:",
-        "dl_name_ph": "Название папки манхвы в библиотеке",
-        "dl_lang": "Язык перевода тайтла:",
-        "dl_lang_auto": "Авто-определение",
-        "dl_start": "🚀 Начать загрузку",
-        "settings_title": "⚙️ Настройки программы",
-        "lang_lbl": "Язык интерфейса:",
-        "speed_lbl": "Скорость скролла клавишами:",
-        "lib_lbl": "Папка библиотеки:",
-        "sounds_lbl": "Папка аудио и фолей (звуков):",
-        "browse_btn": "Обзор...",
-        "select_lib_folder": "Выберите папку библиотеки",
-        "select_sounds_folder": "Выберите папку для аудио и звуковых паков",
-        "save_btn": "💾 Сохранить настройки",
-        "saved_msg": "Настройки успешно сохранены!",
-        "auth_btn": "🤖 Токен Бота",
-        "auth_ok": "🟢 Telegram Бот подключен",
-        "auth_needed": "🟡 Требуется токен бота Telegram",
-        "toggle_extract_jpeg_title": "Распаковывать в JPEG при загрузке",
-        "toggle_extract_jpeg_sub": "Конвертирует PDF-файлы в галерею изображений во время скачивания",
-        "toggle_novel_mode_title": "Новелла / Ранобэ (EPUB / DOCX / TXT)",
-        "toggle_novel_mode_sub": "Сохранять текстовые главы в отдельную Библиотеку Новелл для чтения",
-        "cat_tab_novels": "📖 Новеллы / Ранобэ",
-        "toggle_del_pdf_title": "Удалять исходный PDF после распаковки",
-        "toggle_del_pdf_sub": "Экономит место на диске после создания галереи JPEG",
-        "read_in_jpeg": "Читать в JPEG",
-        "read_in_pdf": "Читать в PDF",
-        "manual_unpack_title": "📦 Ручная распаковка глав (PDF → JPEG)",
-        "manual_unpack_sub": "Выберите манхву и главу из доступных PDF для конвертации в JPEG:",
-        "manual_unpack_m_lbl": "Манхва:",
-        "manual_unpack_ch_lbl": "Глава для распаковки:",
-        "manual_unpack_btn": "⚡ Распаковать выбранную главу в JPEG",
-        "status_only_pdf": "Только PDF",
-        "status_has_jpeg": "Уже есть JPEG",
-        "status_no_pdf": "Нет глав с PDF",
-        "status_empty_m": "В библиотеке нет манхвы",
-        "unpack_confirm_title": "Распаковка JPEG",
-        "unpack_confirm_header": "⚡ Распаковка Главы {ch} в JPEG",
-        "unpack_confirm_msg": "Страницы JPEG для этой главы ещё не распакованы.\nРаспаковать сейчас из имеющегося PDF-файла по нашей технологии?",
-        "unpack_confirm_btn": "⚡ Распаковать в JPEG",
-        "pdf_missing_title": "PDF недоступен",
-        "pdf_missing_msg": "Исходный PDF-файл для главы {ch} был удален после распаковки или отсутствует.",
-        "token_dlg_title": "Настройка Telegram Бота",
-        "token_dlg_header": "🤖 Токен Telegram Бота для загрузки",
-        "token_dlg_info": "Бот позволяет загружать главы без телефонов, SMS и паролей 2FA.\nВставьте сюда токен вашего бота из @BotFather. Он сохранится в config.json.",
-        "token_dlg_lbl": "API Токен Бота:",
-        "token_dlg_ph": "Например: 8599785351:AAFNZkDk1GlpbE-tbmoF7CJBlkGHw45hLTA",
-        "token_save_btn": "💾 Сохранить токен",
-        "token_saved_msg": "Токен успешно сохранен в config.json!",
-        "token_ready_log": "🟢 Telegram Бот подключен! Можно загружать главы.",
-        "ok_btn": "Понятно",
-        "unpacking_progress": "Распаковка главы {num}...",
-        "unpacking_success": "✓ Глава {num} успешно распакована ({count} страниц)!",
-        "unpacking_error": "Ошибка распаковки: {err}",
-        "select_pdf_first": "Выберите главу с имеющимся PDF!",
-        "dl_err_no_channel": "Ошибка: введите ссылку на канал!",
-        "dl_start_log": "Поиск и загрузка для: «{title}» (Главы: {range})...",
-        "dl_all": "все",
-        "log_success_tag": "[УСПЕХ]",
-        "log_error_tag": "[ОШИБКА]",
-        "dl_log_connecting": "Подключение к сервису Telegram через Бота...",
-        "dl_log_searching": "Поиск PDF-глав в канале @{channel}...",
-        "dl_log_found_count": "Найдено глав/файлов: {count}",
-        "dl_log_total_to_download": "Будет загружено глав: {count}. Начинаем...",
-        "dl_log_chapter_header": "[{idx}/{total}] Глава {ch}: {filename}",
-        "dl_log_downloading": "Загрузка {filename} ({size} MB)...",
-        "dl_log_downloaded": "Глава {ch} скачана! Параллельная распаковка в JPEG начата...",
-        "dl_log_extracting": "Распаковка страниц для Главы {ch}...",
-        "dl_log_extract_done": "✓ Глава {ch}: распаковка в JPEG завершена.",
-        "dl_log_saved_pdf": "Сохранено как PDF: Глава {ch}",
-        "dl_log_waiting_extract": "Ожидание завершения фоновых задач распаковки...",
-        "dl_log_done": "Загрузка манхвы «{title}» успешно завершена!",
-        "dl_already_exists_title": "Глава уже скачана",
-        "dl_already_exists_msg": "Следующие главы уже существуют в библиотеке:\n{chapters}\n\nЖелаете скачать их повторно?",
-        "dl_already_exists_redownload": "⚡ Скачать повторно",
-        "dl_already_exists_skip": "Пропустить существующие",
-        "dl_already_exists_cancel": "Отмена",
-        "dl_log_skipped_exists": "Глава {ch} уже существует. Пропуск.",
-        "cat_tab_local": "📚 Локальная библиотека",
-        "cat_tab_cloud": "☁️ Облачное хранилище",
-        "cloud_vault_title": "Облачное хранилище",
-        "cloud_stream_read": "⚡ Читать онлайн",
-        "cloud_empty": "☁️ В вашем облачном хранилище пока нет сохраненных глав.",
-        "cloud_sync_btn": "🔄 Обновить",
-        "cloud_badge": "ОБЛАКО",
-        "cloud_status_streaming": "⚡ Стриминг в RAM (0 байт на диске)",
-        "cloud_card_dl_btn": "📥 Скачать",
-        "cloud_card_dl_tooltip": "Скачать PDF в локальную библиотеку",
-        "cloud_card_chs_word": "глав",
-        "cloud_card_new": "Новая",
-        "cloud_dl_dlg_title": "Скачать PDF",
-        "cloud_dl_dlg_header": "📥 Скачать главу (PDF)",
-        "cloud_dl_total_range": "Всего доступно глав в хранилище: {min_ch}–{max_ch} (всего {total})",
-        "cloud_dl_total_count": "Всего доступно глав в хранилище: {total}",
-        "cloud_dl_folder_lbl": "Куда сохранить (название папки в Library):",
-        "cloud_dl_range_lbl": "Номер или диапазон глав:",
-        "cloud_dl_range_ph": "Например: 1 или 1-10 или 1 2 3",
-        "cloud_dl_btn": "📥 Скачать PDF",
-        "reader_cloud_dl_btn": "📥 Скачать PDF",
-        "notice_dl_success_title": "Загрузка завершена",
-        "notice_dl_success_btn": "Отлично",
-        "notice_dl_error_title": "Ошибка загрузки",
-        "notice_dl_error_btn": "Понятно",
-        "cloud_dl_no_chapters": "Не найдено глав по фильтру '{range}'.",
-        "cloud_dl_start_status": "📥 Начат процесс загрузки {total} глав в библиотеку «{folder}»...",
-        "cloud_dl_chapter_status": "[{idx}/{total}] Загрузка Главы {ch}...",
-        "cloud_dl_saved_pdf": "✓ Глава {ch} сохранена как PDF.",
-        "cloud_dl_finish_success": "Успешно загружено {total} глав манхвы «{folder}»!",
-        "search_ph": "🔍 Поиск тайтлов...",
-        "filter_lang_all": "Все языки",
-        "filter_lang_ua": "🇺🇦 UA",
-        "filter_lang_en": "🇬🇧 EN",
-        "filter_lang_ru": "🇷🇺 RU",
-        "filter_lang_raw": "🌐 RAW / Другие",
-        "filter_prog_all": "Весь прогресс",
-        "filter_prog_reading": "📖 Читаю",
-        "filter_prog_completed": "✅ Прочитано",
-        "filter_prog_unread": "⏳ Не начато",
-        "search_count_lbl": "Найдено: {count}",
-        "btn_translate_nav": "⚔️ Translate",
-        "translate_not_found_title": "Модуль M_Translate не найден!",
-        "translate_not_found_msg": "У вас не установлен модуль Translate. Перейдите в наш официальный Telegram-канал, чтобы скачать полную версию приложения.",
-        "telegram_open_btn": "✈️ Открыть Telegram-канал",
-        "other_translations_avail": "🌐 Доступны другие переводы:",
-        "switch_trans_tip": "Перейти к {lang} версии: {title}",
-        "music_card_title": "🎵 Фоновая музыка и атмосфера (Бета 🛠️🚧)",
-        "music_card_sub": "Атмосферный звуковой эмбиент для полного погружения в манхву и новеллы:",
-        "music_enable_lbl": "Включить фоновый эмбиент:",
-        "music_preset_lbl": "Атмосферный пресет:",
-        "music_vol_lbl": "Громкость музыки и эффектов:",
-        "music_preset_dungeon": "⚔️ Темное подземелье и пещеры",
-        "music_preset_rain": "🌧️ Ночной дождь и легкий ветерок",
-        "music_preset_library": "📚 Древний архив (Шелест страниц)",
-        "music_preset_cyber": "🌆 Киберпанк / Современное фэнтези",
-        "music_beta_notice": "🛠️ Звуковой движок сейчас в режиме бета-тестирования. Пресеты и ИИ-адаптивный саундтрек калибруются.",
-        "gemini_key_lbl": "Ключ Google Gemini API:",
-        "gemini_key_ph": "Введите Gemini API Key...",
-        "show_key_tip": "Показать / скрыть ключ",
-        "clear_key_tip": "Очистить / удалить ключ",
-        "gemini_status_configured": "🟢 Gemini API Key настроен",
-        "gemini_status_none": "⚪ Ключ не указан (будут использоваться базовые звуки)",
-        "preload_section_title": "Предзагрузка глав и бесконечный скролл",
-        "preload_mode_lbl": "Режим предзагрузки следующей главы:",
-        "preload_adaptive": "Адаптивно",
-        "preload_manual": "Фиксированный процент",
-        "preload_disabled": "Отключено",
-        "preload_threshold_lbl": "Порог предзагрузки главы (%):",
-        "progress_display_lbl": "Отображение прогресса в библиотеке:",
-        "progress_mode_chapter": "Процент текущей главы",
-        "progress_mode_overall": "Общий процент от всего тайтла",
-        "music_preset_ai_adaptive": "ИИ-Адаптивный Саундтрек",
-        "music_preset_my_sounds": "[Мои треки] {name}",
-        "music_preset_ui": "[Саундтрек] {name}"
-    }
-}
+# Multilingual Translations (loaded from translations.py)
+try:
+    from manhwa_reader.translations import TRANSLATIONS
+except ImportError:
+    try:
+        from translations import TRANSLATIONS
+    except ImportError:
+        from .translations import TRANSLATIONS
 
 
 def load_config() -> dict:
@@ -1201,8 +630,8 @@ class ConfirmDeleteDialog(QDialog):
         layout.setContentsMargins(28, 26, 28, 24)
         layout.setSpacing(16)
 
-        header_lbl = QLabel(f"🗑️  {title}")
-        header_lbl.setStyleSheet("font-size: 18px; font-weight: 700; color: #f87171;")
+        header_lbl = QLabel(f"ಠ_ಠ  {title}")
+        header_lbl.setStyleSheet("font-size: 18px; font-weight: 800; color: #f87171;")
         layout.addWidget(header_lbl)
 
         msg_lbl = QLabel(lang_dict["del_confirm_msg"].format(title=manhwa_name))
@@ -1431,7 +860,7 @@ class UnpackConfirmDialog(QDialog):
         layout.setContentsMargins(24, 22, 24, 20)
         layout.setSpacing(14)
 
-        header_text = t.get("unpack_confirm_header", "⚡ Розпакування Глави {ch} в JPEG").format(ch=ch_num)
+        header_text = f"(ง •̀_•́)ง " + t.get("unpack_confirm_header", "⚡ Розпакування Глави {ch} в JPEG").format(ch=ch_num)
         title_lbl = QLabel(header_text)
         title_lbl.setStyleSheet("font-size: 17px; font-weight: 800; color: #fbbf24;")
         layout.addWidget(title_lbl)
@@ -1504,7 +933,7 @@ class ChapterAlreadyExistsDialog(QDialog):
         layout.setContentsMargins(24, 22, 24, 20)
         layout.setSpacing(14)
 
-        title_lbl = QLabel(f"⚠️ {t.get('dl_already_exists_title', 'Главу вже завантажено')}")
+        title_lbl = QLabel(f"(•ิ_•ิ) {t.get('dl_already_exists_title', 'Главу вже завантажено')}")
         title_lbl.setStyleSheet("font-size: 17px; font-weight: 800; color: #fbbf24;")
         layout.addWidget(title_lbl)
 
@@ -1607,8 +1036,36 @@ class NoticeDialog(QDialog):
         layout.setSpacing(14)
 
         hdr_row = QHBoxLayout()
-        title_lbl = QLabel(f"⚠️ {title}")
-        title_lbl.setStyleSheet("font-size: 16px; font-weight: 800; color: #fbbf24;")
+        # Check if title already starts with a kaomoji (e.g. (•‿•), (￣▽￣)", ಠ_ಠ, (⊙_⊙;))
+        import re
+        has_existing_kaomoji = bool(re.match(r"^\s*[\(\[ಠ].*?[\)\]ಠ]\s*", title))
+
+        is_error = any(w in title.lower() or w in message.lower() for w in ["помилка", "error", "не знайдено", "not found", "недоступний"])
+        is_success = any(w in title.lower() or w in message.lower() for w in ["успіх", "success", "завершено", "готово", "чудово"])
+        if is_error:
+            kaomoji = "(⊙_⊙;) "
+            badge_color = "#f87171"
+            border_color = "rgba(239, 68, 68, 0.55)"
+        elif is_success:
+            kaomoji = "(￣▽￣)\" "
+            badge_color = "#34d399"
+            border_color = "rgba(52, 211, 153, 0.55)"
+        else:
+            kaomoji = "(•‿•) "
+            badge_color = "#fbbf24"
+            border_color = "rgba(245, 158, 11, 0.55)"
+
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: #12151f;
+                border: 1.5px solid {border_color};
+                border-radius: 16px;
+            }}
+        """)
+
+        clean_title = title if has_existing_kaomoji else f"{kaomoji}{title}"
+        title_lbl = QLabel(clean_title)
+        title_lbl.setStyleSheet(f"font-size: 16px; font-weight: 800; color: {badge_color};")
         hdr_row.addWidget(title_lbl)
         hdr_row.addStretch()
 
@@ -1683,6 +1140,568 @@ class NoticeDialog(QDialog):
             btn_layout.addWidget(act_btn)
 
         layout.addLayout(btn_layout)
+
+
+
+# ---------------------------------------------------------------------------
+# Change Cover Dialog (Drag-and-Drop, 1:1 Auto Crop, Centered & Draggable)
+# ---------------------------------------------------------------------------
+class ChangeCoverDialog(QDialog):
+    """
+    Sleek floating dialog for changing title cover:
+    - Movable / draggable by clicking header or background
+    - Rounded top drop zone with:
+        "( ;) перетягни сюди ⇓"
+    - Subtitle explanation:
+        "щоб поставити нове прев'ю перетягніть в це поле⇑ фото форматом 1:1 (інший формат обріжеться і відцентрується)"
+    - 3 action buttons: [Зберегти] [Скинути] [Скасувати]
+    """
+    def __init__(self, manhwa_name: str, target_dir: Path, t: Optional[dict] = None, parent=None):
+        super().__init__(parent)
+        self.manhwa_name = manhwa_name
+        self.target_dir = Path(target_dir)
+        self.t = t or TRANSLATIONS.get("uk", {})
+        self.original_cover_path = self.target_dir / "cover.jpg"
+        self._new_pixmap: Optional[QPixmap] = None
+        self._drag_pos: Optional[QPoint] = None
+
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setFixedSize(480, 500)
+        self.setAcceptDrops(True)
+
+        self._init_ui()
+
+    def _init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Card container with dark glassy background and subtle border
+        self.container = QFrame(self)
+        self.container.setStyleSheet("""
+            QFrame {
+                background-color: #12151f;
+                border: 1.5px solid rgba(45, 212, 191, 0.45);
+                border-radius: 18px;
+            }
+        """)
+        c_layout = QVBoxLayout(self.container)
+        c_layout.setContentsMargins(24, 20, 24, 20)
+        c_layout.setSpacing(14)
+
+        # Header with title and close button
+        hdr_row = QHBoxLayout()
+        header_text = self.t.get("cover_dlg_header", "Обкладинка: {name}").format(name=self.manhwa_name)
+        title_lbl = QLabel(f"(￣▽￣)\" {header_text}")
+        title_lbl.setStyleSheet("font-size: 15px; font-weight: 800; color: #5eead4; border: none; background: transparent;")
+        hdr_row.addWidget(title_lbl)
+        hdr_row.addStretch()
+
+        close_btn = QPushButton("✕")
+        close_btn.setFixedSize(26, 26)
+        close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #94a3b8;
+                font-weight: 800;
+                font-size: 14px;
+                border: none;
+            }
+            QPushButton:hover {
+                color: #ef4444;
+            }
+        """)
+        close_btn.clicked.connect(self.reject)
+        hdr_row.addWidget(close_btn)
+        c_layout.addLayout(hdr_row)
+
+        # Drop Zone (Rounded rectangle)
+        self.drop_zone = QLabel(self)
+        self.drop_zone.setFixedHeight(230)
+        self.drop_zone.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.drop_zone.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._update_drop_zone_appearance()
+        self.drop_zone.mousePressEvent = self._on_drop_zone_clicked
+        c_layout.addWidget(self.drop_zone)
+
+        # Descriptive subtitle
+        sub_text = self.t.get(
+            "cover_dlg_sub",
+            "щоб поставити нове прев'ю перетягніть в це поле⇑ фото форматом 1:1\n(інший формат обріжеться і відцентрується)"
+        )
+        sub_lbl = QLabel(sub_text)
+        sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub_lbl.setWordWrap(True)
+        sub_lbl.setStyleSheet("font-size: 12px; color: #94a3b8; font-weight: 500; border: none; background: transparent; line-height: 1.35;")
+        c_layout.addWidget(sub_lbl)
+
+        c_layout.addStretch()
+
+        # 3 action buttons: [Зберегти] [Скинути] [Скасувати]
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        # Reset button (removes custom cover and restores default from first PDF/image)
+        reset_btn = QPushButton(self.t.get("cover_dlg_reset", "Скинути"))
+        reset_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.16);
+                color: #f87171;
+                font-weight: 700;
+                font-size: 13px;
+                border: 1px solid rgba(239, 68, 68, 0.35);
+                border-radius: 9px;
+                padding: 9px 16px;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.35);
+                color: #ffffff;
+            }
+        """)
+        reset_btn.clicked.connect(self._on_reset_cover)
+        btn_row.addWidget(reset_btn)
+
+        btn_row.addStretch()
+
+        # Cancel button
+        cancel_btn = QPushButton(self.t.get("cover_dlg_cancel", "Скасувати"))
+        cancel_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1e2433;
+                color: #cbd5e1;
+                font-weight: 600;
+                font-size: 13px;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 9px;
+                padding: 9px 18px;
+            }
+            QPushButton:hover {
+                background-color: #2a3347;
+                color: #ffffff;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+
+        # Save button
+        self.save_btn = QPushButton(self.t.get("cover_dlg_save", "Зберегти"))
+        self.save_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0d9488, stop:1 #2dd4bf);
+                color: #0b1517;
+                font-weight: 800;
+                font-size: 13px;
+                border: none;
+                border-radius: 9px;
+                padding: 9px 24px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #14b8a6, stop:1 #5eead4);
+            }
+        """)
+        self.save_btn.clicked.connect(self._on_save_cover)
+        btn_row.addWidget(self.save_btn)
+
+        c_layout.addLayout(btn_row)
+        main_layout.addWidget(self.container)
+
+    def _update_drop_zone_appearance(self):
+        if self._new_pixmap and not self._new_pixmap.isNull():
+            # Display cropped square preview scaled to fit drop zone
+            scaled = self._new_pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.drop_zone.setPixmap(scaled)
+            self.drop_zone.setStyleSheet("""
+                QLabel {
+                    background-color: #0b0e14;
+                    border: 2px dashed #2dd4bf;
+                    border-radius: 16px;
+                }
+            """)
+        else:
+            drop_text = self.t.get("cover_dlg_drop_text", ";) перетягни сюди ⇓\n\nабо натисни для вибору файлу")
+            self.drop_zone.setText(drop_text)
+            self.drop_zone.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(22, 28, 42, 0.7);
+                    border: 2px dashed rgba(45, 212, 191, 0.6);
+                    border-radius: 16px;
+                    color: #5eead4;
+                    font-size: 15px;
+                    font-weight: 700;
+                }
+                QLabel:hover {
+                    background-color: rgba(22, 28, 42, 0.95);
+                    border-color: #5eead4;
+                    color: #ffffff;
+                }
+            """)
+
+    def _on_drop_zone_clicked(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            from PyQt6.QtWidgets import QFileDialog
+            caption = self.t.get("cover_dlg_select_prompt", "Виберіть зображення для {name}").format(name=self.manhwa_name)
+            fpath, _ = QFileDialog.getOpenFileName(
+                self,
+                caption,
+                str(self.target_dir),
+                "Зображення (*.png *.jpg *.jpeg *.webp)"
+            )
+            if fpath:
+                self._load_and_crop_image(fpath)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.drop_zone.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(45, 212, 191, 0.15);
+                    border: 2px dashed #5eead4;
+                    border-radius: 16px;
+                    color: #ffffff;
+                    font-size: 15px;
+                    font-weight: 700;
+                }
+            """)
+
+    def dragLeaveEvent(self, event):
+        self._update_drop_zone_appearance()
+        event.accept()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            local_path = urls[0].toLocalFile()
+            if local_path and Path(local_path).suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]:
+                self._load_and_crop_image(local_path)
+                event.acceptProposedAction()
+                return
+        self._update_drop_zone_appearance()
+
+    def _load_and_crop_image(self, img_path: str):
+        """Loads image, center-crops to 1:1 square ratio, and prepares for saving."""
+        pm = QPixmap(str(img_path))
+        if pm.isNull():
+            return
+        w = pm.width()
+        h = pm.height()
+        side = min(w, h)
+        x = (w - side) // 2
+        y = (h - side) // 2
+        square_pm = pm.copy(x, y, side, side)
+        self._new_pixmap = square_pm
+        self._update_drop_zone_appearance()
+
+    def _on_save_cover(self):
+        if self._new_pixmap and not self._new_pixmap.isNull():
+            try:
+                dest = self.target_dir / "cover.jpg"
+                self._new_pixmap.save(str(dest), "JPEG", 92)
+                self.accept()
+            except Exception as e:
+                logger.error(f"Failed to save cover: {e}")
+                self.reject()
+        else:
+            self.accept()
+
+    def _on_reset_cover(self):
+        """Removes custom cover.jpg so system generates default from Chapter 1."""
+        try:
+            if self.original_cover_path.exists():
+                self.original_cover_path.unlink()
+            self.accept()
+        except Exception as e:
+            logger.error(f"Failed to reset cover: {e}")
+            self.reject()
+
+    # Enable moving/dragging dialog with mouse
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton and self._drag_pos is not None:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        event.accept()
+
+
+
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Collapsible Tree-Based Music Preset Picker (Auto + Folders > / v)
+# ---------------------------------------------------------------------------
+class CollapsibleMusicPresetPicker(QWidget):
+    """
+    Displays reading audio preset selection:
+    - Top Item: Авто / Auto (clean localized)
+    - Folder categories (> collapsed / v expanded):
+        * <pack_name> -> list of bg/ tracks
+        * my_sounds -> list of tracks
+        * meme -> list of tracks
+        * core -> list of tracks
+    Allows user to expand folders and click any bg track to select it.
+    Folder names are crisp white; selected item highlights in mint / teal.
+    """
+    preset_selected = pyqtSignal(str)  # emits preset data (e.g. "ai_adaptive", "pack:medieval_fantasy:kingdom-sad")
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._current_value = "ai_adaptive"
+        self._auto_label_text = "Авто"
+
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(6)
+
+        # Selected preset banner display
+        self.header_btn = QPushButton("Авто")
+        self.header_btn.setFixedHeight(42)
+        self.header_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.header_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #111e24, stop:1 #0c151c);
+                color: #2dd4bf;
+                border: 1.5px solid rgba(45, 212, 191, 0.6);
+                border-radius: 9px;
+                padding: 6px 14px;
+                font-size: 13px;
+                font-weight: 700;
+                text-align: left;
+            }
+            QPushButton:hover {
+                border-color: #5eead4;
+                background: #16272e;
+            }
+        """)
+        self.header_btn.clicked.connect(self._toggle_tree_view)
+        self.layout.addWidget(self.header_btn)
+
+        # Tree widget for collapsible categories
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        self.tree.setAnimated(True)
+        self.tree.setIndentation(18)
+        self.tree.setStyleSheet("""
+            QTreeWidget {
+                background-color: #0b0f19;
+                border: 1.5px solid rgba(45, 212, 191, 0.25);
+                border-radius: 9px;
+                color: #ffffff;
+                font-size: 13px;
+                padding: 6px;
+                min-height: 200px;
+                max-height: 270px;
+            }
+            QTreeWidget::item {
+                height: 32px;
+                padding-left: 6px;
+                border-radius: 6px;
+                color: #ffffff;
+            }
+            QTreeWidget::item:hover {
+                background-color: rgba(45, 212, 191, 0.12);
+                color: #ffffff;
+            }
+            QTreeWidget::item:selected {
+                background-color: rgba(45, 212, 191, 0.25);
+                color: #2dd4bf;
+                font-weight: 700;
+                border-left: 3px solid #2dd4bf;
+            }
+            QTreeWidget::branch:has-children:!has-siblings:closed,
+            QTreeWidget::branch:closed:has-children {
+                image: none;
+            }
+            QTreeWidget::branch:open:has-children:!has-siblings,
+            QTreeWidget::branch:open:has-children {
+                image: none;
+            }
+        """)
+        self.tree.itemClicked.connect(self._on_item_clicked)
+        self.tree.itemExpanded.connect(self._on_item_expanded)
+        self.tree.itemCollapsed.connect(self._on_item_collapsed)
+        self.layout.addWidget(self.tree)
+        # Initially closed by default; opens upon clicking header button
+        self.tree.setVisible(False)
+
+    def _toggle_tree_view(self):
+        self.tree.setVisible(not self.tree.isVisible())
+
+    def _on_item_expanded(self, item: QTreeWidgetItem):
+        raw_title = item.data(0, Qt.ItemDataRole.UserRole + 1) or item.text(0)
+        clean_title = raw_title.replace("📁 >  ", "").replace("📁 v  ", "")
+        item.setText(0, f"📁 v  {clean_title}")
+
+    def _on_item_collapsed(self, item: QTreeWidgetItem):
+        raw_title = item.data(0, Qt.ItemDataRole.UserRole + 1) or item.text(0)
+        clean_title = raw_title.replace("📁 >  ", "").replace("📁 v  ", "")
+        item.setText(0, f"📁 >  {clean_title}")
+
+    def _on_item_clicked(self, item: QTreeWidgetItem, col: int):
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        if not data:
+            # It's a folder item -> toggle collapse/expand
+            item.setExpanded(not item.isExpanded())
+            return
+
+        self._current_value = str(data)
+        self._update_header_text(item.text(0).strip())
+        self.preset_selected.emit(self._current_value)
+
+    def _update_header_text(self, display_text: str):
+        if self._current_value == "ai_adaptive":
+            self.header_btn.setText(self._auto_label_text)
+            self.header_btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #111e24, stop:1 #0c151c);
+                    color: #2dd4bf;
+                    border: 1.5px solid rgba(45, 212, 191, 0.7);
+                    border-radius: 9px;
+                    padding: 6px 14px;
+                    font-size: 13px;
+                    font-weight: 700;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    border-color: #5eead4;
+                    background: #16272e;
+                }
+            """)
+        else:
+            clean = display_text.replace("🎵", "").strip()
+            self.header_btn.setText(f"🎵 {clean}")
+            self.header_btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #112327, stop:1 #0c181c);
+                    color: #5eead4;
+                    border: 1.5px solid #2dd4bf;
+                    border-radius: 9px;
+                    padding: 6px 14px;
+                    font-size: 13px;
+                    font-weight: 700;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    border-color: #99f6e4;
+                    background: #162d33;
+                }
+            """)
+
+    def currentData(self) -> str:
+        return self._current_value
+
+    def populate(self, sounds_root: Path, auto_title: str = "Авто"):
+        self.tree.clear()
+        sounds_root = Path(sounds_root)
+        # Strip any accidental emojis or brackets from auto_title
+        clean_auto = auto_title.replace("⚡", "").strip()
+        if "(" in clean_auto:
+            clean_auto = clean_auto.split("(")[0].strip()
+        if not clean_auto:
+            clean_auto = "Авто"
+        self._auto_label_text = clean_auto
+
+        # 1. Top Level Auto Item (Clean, no emojis, no brackets)
+        auto_item = QTreeWidgetItem(self.tree)
+        auto_item.setText(0, clean_auto)
+        auto_item.setData(0, Qt.ItemDataRole.UserRole, "ai_adaptive")
+        auto_item.setFont(0, QFont("Segoe UI", 10, QFont.Weight.Bold))
+        auto_item.setForeground(0, QBrush(QColor("#2dd4bf")))
+
+        # Helper to style folder item
+        def _add_folder(name: str, count: int) -> QTreeWidgetItem:
+            f_item = QTreeWidgetItem(self.tree)
+            lbl = f"📁 >  {name} ({count})"
+            f_item.setText(0, lbl)
+            f_item.setData(0, Qt.ItemDataRole.UserRole + 1, lbl)
+            f_item.setFont(0, QFont("Segoe UI", 10, QFont.Weight.Bold))
+            f_item.setForeground(0, QBrush(QColor("#ffffff")))
+            return f_item
+
+        def _add_track(parent_item: QTreeWidgetItem, track_name: str, preset_val: str):
+            t_item = QTreeWidgetItem(parent_item)
+            clean_name = track_name.replace("-", " ").replace("_", " ")
+            t_item.setText(0, f"   🎵 {clean_name}")
+            t_item.setData(0, Qt.ItemDataRole.UserRole, preset_val)
+            t_item.setForeground(0, QBrush(QColor("#cbd5e1")))
+
+        # 2. Packs Folder categories (sounds/packs/<pack>/bg)
+        packs_dir = sounds_root / "packs"
+        if packs_dir.exists():
+            for pack_folder in sorted([p for p in packs_dir.iterdir() if p.is_dir()]):
+                pack_name = pack_folder.name
+                bg_dir = pack_folder / "bg"
+                bg_files = sorted(list(bg_dir.glob("*.*"))) if bg_dir.exists() else []
+                bg_files = [f for f in bg_files if f.suffix.lower() in [".mp3", ".ogg", ".wav"]]
+
+                pack_item = _add_folder(pack_name, len(bg_files))
+                for track in bg_files:
+                    _add_track(pack_item, track.stem, f"pack:{pack_name}:{track.stem}")
+
+        # 3. My sounds category
+        my_sounds_dir = sounds_root / "my_sounds"
+        my_files = sorted(list(my_sounds_dir.glob("*.*"))) if my_sounds_dir.exists() else []
+        my_files = [f for f in my_files if f.suffix.lower() in [".mp3", ".ogg", ".wav"]]
+        my_item = _add_folder("my_sounds", len(my_files))
+        for track in my_files:
+            _add_track(my_item, track.stem, f"my_sounds:{track.stem}")
+
+        # 4. Meme category
+        meme_dir = sounds_root / "meme"
+        meme_files = sorted(list(meme_dir.glob("*.*"))) if meme_dir.exists() else []
+        meme_files = [f for f in meme_files if f.suffix.lower() in [".mp3", ".ogg", ".wav"]]
+        meme_item = _add_folder("meme", len(meme_files))
+        for track in meme_files:
+            _add_track(meme_item, track.stem, f"meme:{track.stem}")
+
+        # 5. Core soundtrack category (if exists)
+        core_bg_dir = sounds_root / "core" / "bg"
+        core_files = sorted(list(core_bg_dir.glob("*.*"))) if core_bg_dir.exists() else []
+        core_files = [f for f in core_files if f.suffix.lower() in [".mp3", ".ogg", ".wav"] and f.stem != "test_sound"]
+        if core_files:
+            core_item = _add_folder("core", len(core_files))
+            for track in core_files:
+                _add_track(core_item, track.stem, f"core:{track.stem}")
+
+        # Sync selection
+        self.setCurrentData(self._current_value)
+
+    def setCurrentData(self, target_val: str):
+        self._current_value = target_val or "ai_adaptive"
+        found = False
+        def _check_item(it: QTreeWidgetItem):
+            nonlocal found
+            data = it.data(0, Qt.ItemDataRole.UserRole)
+            if data and data == target_val:
+                self.tree.setCurrentItem(it)
+                self._update_header_text(it.text(0))
+                p = it.parent()
+                if p:
+                    p.setExpanded(True)
+                found = True
+                return
+            for i in range(it.childCount()):
+                _check_item(it.child(i))
+
+        for idx in range(self.tree.topLevelItemCount()):
+            top = self.tree.topLevelItem(idx)
+            _check_item(top)
+            if found:
+                break
+
+        if not found:
+            self._current_value = "ai_adaptive"
+            self.header_btn.setText(self._auto_label_text)
+            if self.tree.topLevelItemCount() > 0:
+                self.tree.setCurrentItem(self.tree.topLevelItem(0))
 
 
 
@@ -2250,6 +2269,8 @@ class ManhwaCard(QFrame):
     read_clicked = pyqtSignal(str)
     delete_clicked = pyqtSignal(str)
     switch_translation_clicked = pyqtSignal(dict)  # item info dict with "type", "target", etc.
+    change_cover_clicked = pyqtSignal(str)         # manhwa_name
+    reclassify_clicked = pyqtSignal(str)           # manhwa_name
 
     def __init__(self, manhwa_name: str, manhwa_path: Path, bookmark_info: dict, lang_dict: dict, linked_translations: Optional[List[dict]] = None, parent=None):
         super().__init__(parent)
@@ -2282,6 +2303,8 @@ class ManhwaCard(QFrame):
         self.cover_lbl = QLabel()
         self.cover_lbl.setFixedHeight(210)
         self.cover_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.cover_lbl.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.cover_lbl.setToolTip(self.lang_dict.get("card_click_to_read", "Натисніть для відкриття тайтлу"))
         self.cover_lbl.setStyleSheet("""
             background-color: #0c0e14;
             border-radius: 10px;
@@ -2380,7 +2403,7 @@ class ManhwaCard(QFrame):
         layout.addLayout(pills_row)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
+        btn_row.setSpacing(6)
 
         read_btn = QPushButton(self.lang_dict["read_btn"])
         read_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -2391,7 +2414,7 @@ class ManhwaCard(QFrame):
                 font-size: 13px;
                 font-weight: 800;
                 border-radius: 9px;
-                padding: 8px 12px;
+                padding: 8px 10px;
                 border: none;
             }
             QPushButton:hover {
@@ -2399,8 +2422,52 @@ class ManhwaCard(QFrame):
             }
         """)
         read_btn.clicked.connect(lambda: self.read_clicked.emit(self.manhwa_name))
-        btn_row.addWidget(read_btn, 4)
+        btn_row.addWidget(read_btn, stretch=3)
 
+        # 1. Change cover button
+        cover_btn = QPushButton("🖼️")
+        cover_btn.setToolTip(self.lang_dict.get("card_cover_tip", "Змінити обкладинку тайтлу"))
+        cover_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        cover_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.16);
+                color: #60a5fa;
+                font-size: 13px;
+                border: 1px solid rgba(59, 130, 246, 0.35);
+                border-radius: 9px;
+                padding: 6px 7px;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.35);
+                color: #ffffff;
+            }
+        """)
+        cover_btn.clicked.connect(lambda: self.change_cover_clicked.emit(self.manhwa_name))
+        btn_row.addWidget(cover_btn)
+
+        # 2. Re-analyze / check genre tag button
+        reclass_btn = QPushButton("↺")
+        reclass_btn.setToolTip(self.lang_dict.get("card_reclass_tip", "Перевірити / оновити жанр та сеттинг через ШІ"))
+        reclass_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        reclass_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(45, 212, 191, 0.16);
+                color: #2dd4bf;
+                font-size: 14px;
+                font-weight: 800;
+                border: 1px solid rgba(45, 212, 191, 0.35);
+                border-radius: 9px;
+                padding: 6px 7px;
+            }
+            QPushButton:hover {
+                background-color: rgba(45, 212, 191, 0.35);
+                color: #ffffff;
+            }
+        """)
+        reclass_btn.clicked.connect(lambda: self.reclassify_clicked.emit(self.manhwa_name))
+        btn_row.addWidget(reclass_btn)
+
+        # 3. Delete button
         del_btn = QPushButton("🗑️")
         del_btn.setToolTip(self.lang_dict["del_tooltip"])
         del_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -2408,11 +2475,11 @@ class ManhwaCard(QFrame):
             QPushButton {
                 background-color: rgba(239, 68, 68, 0.16);
                 color: #f87171;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 700;
                 border: 1px solid rgba(239, 68, 68, 0.35);
                 border-radius: 9px;
-                padding: 7px 9px;
+                padding: 6px 7px;
             }
             QPushButton:hover {
                 background-color: rgba(220, 38, 38, 0.35);
@@ -2420,7 +2487,7 @@ class ManhwaCard(QFrame):
             }
         """)
         del_btn.clicked.connect(lambda: self.delete_clicked.emit(self.manhwa_name))
-        btn_row.addWidget(del_btn, 1)
+        btn_row.addWidget(del_btn)
 
         layout.addLayout(btn_row)
 
@@ -2468,6 +2535,17 @@ class ManhwaCard(QFrame):
                 return
 
         self.cover_lbl.setText("📖\nCover")
+
+    def mousePressEvent(self, event):
+        """Allows opening reader when clicking anywhere on the card/cover, except buttons."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Check if clicked on a child button (cover_btn, reclass_btn, del_btn, etc.)
+            child = self.childAt(event.position().toPoint())
+            if not isinstance(child, QPushButton):
+                self.read_clicked.emit(self.manhwa_name)
+                event.accept()
+                return
+        super().mousePressEvent(event)
 
 
 # ---------------------------------------------------------------------------
@@ -2972,6 +3050,12 @@ class WebtoonScrollCanvas(QScrollArea):
             p.sound_engine.set_chapter_loading(False)
             return
 
+        # Detect title profile and propagate setting pack to sound_engine
+        if getattr(p, "title_classifier", None) and self.current_manhwa_name:
+            prof = p.title_classifier.get_title_profile(self.current_manhwa_name)
+            if prof:
+                p.sound_engine.set_setting_pack(prof.get("setting_pack"))
+
         # 1. Use in-RAM preloaded timeline if available
         if ch_num in self.preloaded_timelines:
             tl = self.preloaded_timelines[ch_num]
@@ -3420,12 +3504,22 @@ class ManhwaApp(QMainWindow):
         # Sound Engine & AI Atmosphere Analyzer
         gemini_key = self.cfg.get("gemini_api_key", "")
         self.ai_analyzer = AISoundAnalyzer(api_key=gemini_key, sounds_dir=self.sounds_dir) if AISoundAnalyzer is not None else None
+        self.title_classifier = TitleClassifier(api_key=gemini_key) if TitleClassifier is not None else None
         if SoundEngine is not None:
             self.sound_engine = SoundEngine(self, sounds_dir=self.sounds_dir)
             self.sound_engine.set_enabled(self.cfg.get("music_enabled", False))
             self.sound_engine.set_volume(self.cfg.get("music_volume", 40))
         else:
             self.sound_engine = None
+
+        # Dedicated test sound player for volume calibration in Settings
+        self._test_audio_out = QAudioOutput(self)
+        self._test_audio_player = QMediaPlayer(self)
+        self._test_audio_player.setAudioOutput(self._test_audio_out)
+
+        # Kick off background scan for unclassified titles (rate limited <= 1 req/min)
+        if self.title_classifier and gemini_key:
+            QTimer.singleShot(2500, lambda: self.title_classifier.scan_unclassified_titles(self.lib_dir))
 
         self.init_window_properties()
         self.init_ui()
@@ -3922,6 +4016,8 @@ class ManhwaApp(QMainWindow):
             card.read_clicked.connect(self.open_manhwa_reader)
             card.delete_clicked.connect(self.confirm_delete_manhwa)
             card.switch_translation_clicked.connect(self.on_switch_translation)
+            card.change_cover_clicked.connect(self.on_change_manhwa_cover)
+            card.reclassify_clicked.connect(self.on_reclassify_manhwa)
 
             row = displayed_count // cols
             col = displayed_count % cols
@@ -4030,6 +4126,8 @@ class ManhwaApp(QMainWindow):
             card = ManhwaCard(n_name, n_path, bm, self.t)
             card.read_clicked.connect(lambda name, p=n_path: self.open_novel_reader(name, p))
             card.delete_clicked.connect(self.confirm_delete_manhwa)
+            card.change_cover_clicked.connect(self.on_change_manhwa_cover)
+            card.reclassify_clicked.connect(self.on_reclassify_manhwa)
 
             row = displayed_count // cols
             col = displayed_count % cols
@@ -4256,6 +4354,53 @@ class ManhwaApp(QMainWindow):
                 save_config(self.cfg)
 
             self.refresh_catalog()
+
+    def on_change_manhwa_cover(self, manhwa_name: str):
+        """Allows user to set or change cover via drag-and-drop dialog with 1:1 auto-crop."""
+        target_dir = self.lib_dir / manhwa_name
+        if not target_dir.exists():
+            novels_dir = self.lib_dir / "novels_library" / manhwa_name
+            if novels_dir.exists():
+                target_dir = novels_dir
+
+        dlg = ChangeCoverDialog(manhwa_name, target_dir, t=self.t, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.refresh_catalog()
+
+    def on_reclassify_manhwa(self, manhwa_name: str):
+        """Re-triggers setting & genre AI classification for the title."""
+        target_dir = self.lib_dir / manhwa_name
+        if not target_dir.exists():
+            novels_dir = self.lib_dir / "novels_library" / manhwa_name
+            if novels_dir.exists():
+                target_dir = novels_dir
+
+        if not hasattr(self, "title_classifier") or not self.title_classifier:
+            err_title = self.t.get("reclass_dlg_not_ready_title", "ШІ Класифікатор не готовий")
+            err_msg = self.t.get(
+                "reclass_dlg_not_ready_msg",
+                "Модуль TitleClassifier не ініціалізовано або відсутній Gemini API ключ у налаштуваннях."
+            )
+            NoticeDialog(
+                f"ಠ_ಠ {err_title}",
+                err_msg,
+                btn_text=self.t.get("ok_btn", "Зрозуміло"),
+                parent=self
+            ).exec()
+            return
+
+        self.title_classifier.queue_title_analysis(target_dir, priority_first=True, force=True)
+        ok_title = self.t.get("reclass_dlg_sent_title", "Запит надіслано!")
+        ok_msg = self.t.get(
+            "reclass_dlg_sent_msg",
+            "ШІ отримав запит на аналіз жанру та сеттингу для:\n«{name}».\n\nЗапит виконується у фоні (ліміт: 1 запит/хв). Коли аналіз завершиться, відповідний пак підтягнеться автоматично!"
+        ).format(name=manhwa_name)
+        NoticeDialog(
+            f"(•‿•) {ok_title}",
+            ok_msg,
+            btn_text=self.t.get("notice_dl_success_btn", "Гаразд"),
+            parent=self
+        ).exec()
 
     # -----------------------------------------------------------------------
     # TAB 1: WEBTOON READER (Zen Mode)
@@ -4935,6 +5080,16 @@ class ManhwaApp(QMainWindow):
             tag = self.t.get("log_success_tag", "[УСПІХ]")
             self.dl_log.append(f"\n{tag} {msg}")
             self.refresh_catalog()
+
+            # Automatically queue this title for background setting/genre classification
+            if self.title_classifier:
+                selected_title = self.dl_title_input.text().strip()
+                if selected_title:
+                    target_dir = self.lib_dir / selected_title
+                    if target_dir.exists():
+                        self.title_classifier.queue_title_analysis(target_dir, priority_first=True)
+                else:
+                    self.title_classifier.scan_unclassified_titles(self.lib_dir)
         else:
             tag = self.t.get("log_error_tag", "[ПОМИЛКА]")
             self.dl_log.append(f"\n{tag} {msg}")
@@ -5209,8 +5364,9 @@ class ManhwaApp(QMainWindow):
         mc_grid = QGridLayout()
         mc_grid.setSpacing(14)
 
+        # Toggle 1: Background ambient during reading
         self.music_enable_toggle = NeoToggle(
-            self.t.get("music_enable_lbl", "Увімкнути фоновий ембієнт:"),
+            self.t.get("music_enable_lbl", "Увімкнути фоновий ембієнт при читанні:"),
             "",
             checked=self.cfg.get("music_enabled", False),
             parent=self
@@ -5218,25 +5374,60 @@ class ManhwaApp(QMainWindow):
         self.music_enable_toggle.toggled.connect(self._on_music_enabled_toggled)
         mc_grid.addWidget(self.music_enable_toggle, 0, 0, 1, 2)
 
+        # Toggle 2: App Lobby & Background Audio Toggle (Preparatory toggle)
+        self.music_app_enable_toggle = NeoToggle(
+            self.t.get("music_app_enable_lbl", "Увімкнути звуки інтерфейсу:"),
+            "",
+            checked=self.cfg.get("music_app_enabled", False),
+            parent=self
+        )
+        self.music_app_enable_toggle.toggled.connect(self._on_music_app_enabled_toggled)
+        mc_grid.addWidget(self.music_app_enable_toggle, 1, 0, 1, 2)
+
         self.music_preset_lbl = QLabel(self.t.get("music_preset_lbl", "Режим відтворення / Фоновий трек:"))
-        mc_grid.addWidget(self.music_preset_lbl, 1, 0)
-        self.music_preset_combo = QComboBox()
+        mc_grid.addWidget(self.music_preset_lbl, 2, 0, Qt.AlignmentFlag.AlignTop)
+
+        # Collapsible Tree Picker for Auto + Packs / my_sounds / meme
+        self.music_preset_picker = CollapsibleMusicPresetPicker(self)
         self._populate_music_presets()
-        self.music_preset_combo.currentIndexChanged.connect(self._on_music_preset_changed)
-        apply_combo_style(self.music_preset_combo)
-        mc_grid.addWidget(self.music_preset_combo, 1, 1)
+        self.music_preset_picker.preset_selected.connect(self._on_music_preset_selected)
+        mc_grid.addWidget(self.music_preset_picker, 2, 1)
 
         self.music_vol_lbl = QLabel(self.t.get("music_vol_lbl", "Гучність звуку:"))
-        mc_grid.addWidget(self.music_vol_lbl, 2, 0)
+        mc_grid.addWidget(self.music_vol_lbl, 3, 0)
         self.music_vol_slider = QSlider(Qt.Orientation.Horizontal)
         self.music_vol_slider.setRange(0, 100)
         self.music_vol_slider.setValue(self.cfg.get("music_volume", 40))
+        self.music_vol_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 6px;
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 3px;
+            }
+            QSlider::sub-page:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #3b82f6);
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: #fbbf24;
+                border: 2px solid #ffffff;
+                width: 16px;
+                margin-top: -5px;
+                margin-bottom: -5px;
+                border-radius: 8px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #fcd34d;
+                border-color: #fef08a;
+            }
+        """)
         self.music_vol_slider.valueChanged.connect(self._on_music_volume_value_changed)
-        mc_grid.addWidget(self.music_vol_slider, 2, 1)
+        mc_grid.addWidget(self.music_vol_slider, 3, 1)
 
-        # Row 3: Gemini API Key Input
+        # Row 4: Gemini API Key Input
         self.gemini_key_lbl = QLabel(self.t.get("gemini_key_lbl", "Ключ Google Gemini API:"))
-        mc_grid.addWidget(self.gemini_key_lbl, 3, 0)
+        mc_grid.addWidget(self.gemini_key_lbl, 4, 0)
 
         key_box = QHBoxLayout()
         key_box.setSpacing(8)
@@ -5290,9 +5481,9 @@ class ManhwaApp(QMainWindow):
         key_box.addWidget(self.gemini_key_inp, stretch=1)
         key_box.addWidget(self.gemini_toggle_vis_btn)
         key_box.addWidget(self.gemini_clear_btn)
-        mc_grid.addLayout(key_box, 3, 1)
+        mc_grid.addLayout(key_box, 4, 1)
 
-        # Row 4: Status Indicator & Instant Save Button
+        # Row 5: Status Indicator & Instant Save Button
         status_box = QHBoxLayout()
         self.gemini_status_lbl = QLabel("")
         self._update_gemini_status_display()
@@ -5316,6 +5507,7 @@ class ManhwaApp(QMainWindow):
         """)
         self.music_save_btn.clicked.connect(self.save_settings)
         status_box.addWidget(self.music_save_btn)
+        mc_grid.addLayout(status_box, 5, 0, 1, 2)
         mc_layout.addLayout(mc_grid)
 
         self.music_notice_lbl = QLabel(self.t.get("music_beta_notice", "Звуковий рушій бере аудіо з папки sounds/ (поруч із library/). Підтримуються як окремі файли, так і підпапки (наприклад sounds/ambient/forest/)."))
@@ -5603,56 +5795,48 @@ class ManhwaApp(QMainWindow):
                 self.preload_thresh_val_lbl.setStyleSheet("font-weight: 700; color: #6b7280; min-width: 45px;")
 
     def _populate_music_presets(self):
-        """Unified single source of truth for filling music_preset_combo across language changes."""
-        if not hasattr(self, "music_preset_combo"):
-            return
-        curr_preset = self.music_preset_combo.currentData() or self.cfg.get("music_preset", "ai_adaptive")
-        self.music_preset_combo.blockSignals(True)
-        self.music_preset_combo.clear()
-
-        # 1. AI adaptive option
-        ai_title = self.t.get("music_preset_ai_adaptive", "✨ ШІ-Адаптивний Саундтрек (динамічно за сценами)")
-        self.music_preset_combo.addItem(ai_title, "ai_adaptive")
-
-        # 2. My sounds
+        """Fills collapsible tree picker with Auto and all pack / my_sounds / meme folders."""
+        curr_preset = self.cfg.get("music_preset", "ai_adaptive")
         sounds_root = getattr(self, "sounds_dir", BASE_DIR / "sounds")
-        my_sounds_path = sounds_root / "my_sounds"
-        my_tpl = self.t.get("music_preset_my_sounds", "⭐ [Мої треки] {name}")
-        if my_sounds_path.exists():
-            for f in sorted(list(my_sounds_path.glob("*.*"))):
-                if f.suffix.lower() in [".mp3", ".ogg", ".wav"]:
-                    self.music_preset_combo.addItem(my_tpl.format(name=f.stem), f"my_sounds:{f.stem}")
+        auto_title = self.t.get("music_preset_ai_adaptive", "Авто")
 
-        # 3. UI soundtrack tracks
-        ui_path = sounds_root / "ui"
-        ui_tpl = self.t.get("music_preset_ui", "🎶 [Саундтрек] {name}")
-        if ui_path.exists():
-            for f in sorted(list(ui_path.glob("*.*"))):
-                if f.suffix.lower() in [".mp3", ".ogg", ".wav"] and f.stem != "test_sound":
-                    self.music_preset_combo.addItem(ui_tpl.format(name=f.stem), f"ui:{f.stem}")
-
-        p_idx = self.music_preset_combo.findData(curr_preset)
-        if p_idx >= 0:
-            self.music_preset_combo.setCurrentIndex(p_idx)
-        else:
-            self.music_preset_combo.setCurrentIndex(0)
-        self.music_preset_combo.blockSignals(False)
+        if hasattr(self, "music_preset_picker"):
+            self.music_preset_picker.populate(sounds_root, auto_title=auto_title)
+            self.music_preset_picker.setCurrentData(curr_preset)
 
     def _on_music_volume_value_changed(self, val: int):
-        """Clean volume adjustment without overlapping preview sounds."""
+        """Volume adjustment with instant test_sound preview for precise volume feedback."""
         try:
             self.cfg["music_volume"] = int(val)
             if hasattr(self, "sound_engine") and self.sound_engine:
                 self.sound_engine.set_volume(val)
+
+            # Preview test_sound so user immediately hears actual volume calibration
+            curr_preset = self.cfg.get("music_preset", "ai_adaptive")
+            if curr_preset == "ai_adaptive":
+                if hasattr(self, "_test_audio_player") and hasattr(self, "_test_audio_out"):
+                    self._test_audio_out.setVolume(max(0.0, min(1.0, float(val) / 100.0)))
+                    # Find test_sound file (core/bg/test_sound.wav or test_sound.mp3)
+                    if self._test_audio_player.playbackState() != QMediaPlayer.PlaybackState.PlayingState:
+                        test_file = None
+                        if hasattr(self, "sounds_dir"):
+                            for cand in [
+                                self.sounds_dir / "core" / "bg" / "test_sound.wav",
+                                self.sounds_dir / "core" / "bg" / "test_sound.mp3",
+                                self.sounds_dir / "core" / "bg" / "test_sound.mp3.bak"
+                            ]:
+                                if cand.exists():
+                                    test_file = cand
+                                    break
+                        if test_file:
+                            self._test_audio_player.setSource(QUrl.fromLocalFile(str(test_file)))
+                            self._test_audio_player.play()
         except Exception as e:
             logger.debug(f"Volume change error: {e}")
 
-    def _on_music_preset_changed(self, idx: int):
-        """Switch audio preset or AI mode cleanly without playing multiple tracks at once."""
+    def _on_music_preset_selected(self, data: str):
+        """Switch audio preset or AI mode cleanly when user selects item in collapsible tree."""
         try:
-            if not hasattr(self, "music_preset_combo"):
-                return
-            data = self.music_preset_combo.currentData()
             if not data or not hasattr(self, "sound_engine") or not self.sound_engine:
                 return
 
@@ -5671,14 +5855,16 @@ class ManhwaApp(QMainWindow):
                     self.music_enable_toggle.setChecked(True)
                 vol = self.music_vol_slider.value() if hasattr(self, "music_vol_slider") else 50
                 self.sound_engine.set_volume(vol)
-                track_name = data.split(":", 1)[-1] if ":" in data else data
+                track_name = data.split(":")[-1]
                 self.sound_engine.play_ambient(track_name, fade_ms=300)
         except Exception as e:
-            logger.debug(f"Preset change error: {e}")
+            logger.debug(f"Preset selection error: {e}")
 
     def _on_music_enabled_toggled(self, checked: bool):
-        """Immediately syncs sound engine enabled state."""
+        """Immediately syncs sound engine enabled state for reading ambient."""
         try:
+            self.cfg["music_enabled"] = checked
+            save_config(self.cfg)
             if hasattr(self, "sound_engine") and self.sound_engine:
                 self.sound_engine.set_enabled(checked)
                 if not checked:
@@ -5686,7 +5872,16 @@ class ManhwaApp(QMainWindow):
                     if hasattr(self, "_test_audio_player") and self._test_audio_player:
                         self._test_audio_player.stop()
         except Exception as e:
-            logger.debug(f"Music toggle error: {e}")
+            logger.debug(f"Reading music toggle error: {e}")
+
+    def _on_music_app_enabled_toggled(self, checked: bool):
+        """Toggle for App Lobby / Interface Ambient Sound (Preparatory toggle)."""
+        try:
+            self.cfg["music_app_enabled"] = checked
+            save_config(self.cfg)
+            logger.info(f"App lobby audio toggle set to: {checked}")
+        except Exception as e:
+            logger.debug(f"App music toggle error: {e}")
 
     def on_language_combo_change(self, idx: int):
         new_lang = self.lang_combo.currentData()
@@ -5710,8 +5905,10 @@ class ManhwaApp(QMainWindow):
             self.cfg["progress_display_mode"] = self.progress_display_combo.currentData() or "chapter"
         if hasattr(self, "music_enable_toggle"):
             self.cfg["music_enabled"] = self.music_enable_toggle.isChecked()
-        if hasattr(self, "music_preset_combo"):
-            self.cfg["music_preset"] = self.music_preset_combo.currentData() or "ai_adaptive"
+        if hasattr(self, "music_app_enable_toggle"):
+            self.cfg["music_app_enabled"] = self.music_app_enable_toggle.isChecked()
+        if hasattr(self, "music_preset_picker"):
+            self.cfg["music_preset"] = self.music_preset_picker.currentData() or "ai_adaptive"
         if hasattr(self, "music_vol_slider"):
             self.cfg["music_volume"] = self.music_vol_slider.value()
 
@@ -5952,12 +6149,14 @@ class ManhwaApp(QMainWindow):
         if hasattr(self, "music_sub"):
             self.music_sub.setText(self.t.get("music_card_sub", "Атмосферний звуковий ембієнт для повного занурення в манхву та новели:"))
         if hasattr(self, "music_enable_toggle"):
-            self.music_enable_toggle.set_texts(self.t.get("music_enable_lbl", "Увімкнути фоновий ембієнт:"), "")
+            self.music_enable_toggle.set_texts(self.t.get("music_enable_lbl", "Увімкнути фоновий ембієнт при читанні:"), "")
+        if hasattr(self, "music_app_enable_toggle"):
+            self.music_app_enable_toggle.set_texts(self.t.get("music_app_enable_lbl", "Увімкнути фонові звуки програми (Лоббі):"), "")
         if hasattr(self, "music_preset_lbl"):
-            self.music_preset_lbl.setText(self.t.get("music_preset_lbl", "Атмосферний пресет:"))
+            self.music_preset_lbl.setText(self.t.get("music_preset_lbl", "Режим відтворення / Фоновий трек:"))
         if hasattr(self, "music_vol_lbl"):
-            self.music_vol_lbl.setText(self.t.get("music_vol_lbl", "Гучність музики та ефектів:"))
-        if hasattr(self, "music_preset_combo"):
+            self.music_vol_lbl.setText(self.t.get("music_vol_lbl", "Гучність звуку:"))
+        if hasattr(self, "music_preset_picker"):
             self._populate_music_presets()
         if hasattr(self, "music_notice_lbl"):
             self.music_notice_lbl.setText(self.t.get("music_beta_notice", "🛠️ Звуковий рушій наразі у режимі бета-тестування. Пресети та ШІ-адаптивний саундтрек проходять калібрування."))
@@ -6088,8 +6287,13 @@ class ManhwaApp(QMainWindow):
         # Stop preview test sound immediately whenever leaving settings tab (index 3)
         if prev_idx == 3 and index != 3:
             if hasattr(self, "sound_engine") and self.sound_engine:
-                if self.sound_engine.current_mood == "test_sound":
-                    self.sound_engine.stop_all(fade=False)
+                if self.sound_engine.current_bg == "test_sound":
+                    self.sound_engine.stop_all(fade=True)
+                    # If user chose a custom preset track, restore it
+                    curr_preset = self.cfg.get("music_preset", "ai_adaptive")
+                    if curr_preset != "ai_adaptive" and self.cfg.get("music_enabled", False):
+                        track_name = curr_preset.split(":")[-1]
+                        self.sound_engine.play_ambient(track_name, fade_ms=300)
 
         # UI Sound feedback and smooth ambient fade when navigating
         if hasattr(self, "_test_audio_player") and self._test_audio_player:

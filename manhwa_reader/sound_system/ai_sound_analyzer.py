@@ -40,63 +40,84 @@ TONE_POOL = [
 TIMELINE_FILENAME = "sound_timeline.json"
 
 
-def scan_layered_sound_pools(sounds_dir: Path) -> tuple[list[str], list[str], list[str]]:
+def scan_layered_sound_pools(sounds_dir: Path, setting_pack: Optional[str] = None) -> tuple[list[str], list[str], list[str]]:
     """
     Categorizes available audio tracks into 3 distinct layers for AI sound design:
-    1. bg_pool: Long melodic background music/score (from ui/ and musical ambients)
-    2. amb_pool: Environmental atmosphere (fireplace, rain, wind, crowd, tavern, cave, forest)
-    3. sfx_pool: Immediate sound effects and physical action loops (swords, hits, run, gallop, scream)
+    1. bg_pool: Background score/music (orchestral, synths, emotional tracks)
+    2. amb_pool: Environmental atmosphere (wind, tavern, cave, school noise, rain)
+    3. sfx_pool: Immediate sound effects and action loops (swords, hits, run, laughs, meme sounds)
+
+    Supports both legacy flat layout (ambient/, sfx/, ui/) AND new modular layout:
+    - sounds/core/ (universal bg, amb, sfx)
+    - sounds/packs/<setting_pack>/ (genre-specific bg, amb, sfx)
+    - sounds/meme/ (neutral & meme sounds)
+    - sounds/my_sounds/ (user custom tracks)
     """
     import re
-    amb_dir = sounds_dir / "ambient"
-    ui_dir = sounds_dir / "ui"
-    my_dir = sounds_dir / "my_sounds"
-    sfx_dir = sounds_dir / "sfx"
-
     bg_candidates = set(["silence"])
     amb_candidates = set(["silence"])
     sfx_candidates = set(["none"])
 
-    # Scan installed files dynamically from all sound directories
-    for directory in [amb_dir, ui_dir, my_dir]:
-        if directory.exists():
-            for item in directory.rglob("*"):
-                if item.is_file() and item.suffix.lower() in [".mp3", ".ogg", ".wav"]:
-                    base = re.sub(r'_\d+$', '', item.stem).strip().lower()
-                    if base and not base.startswith("test_sound"):
-                        # If file is in ui or has melodic indicators, place in bg
-                        if directory == ui_dir or any(k in base for k in ["music", "empire", "melody", "flute", "theme", "bloom", "celtic", "cello", "glow", "rafter", "kingdom"]):
-                            bg_candidates.add(base)
-                        else:
-                            amb_candidates.add(base)
+    def _add_file(f: Path, target_layer: Optional[str] = None):
+        if not f.is_file() or f.suffix.lower() not in [".mp3", ".ogg", ".wav"]:
+            return
+        base = re.sub(r'_\d+$', '', f.stem).strip().lower()
+        if not base or base.startswith("test_sound"):
+            return
 
-    if sfx_dir.exists():
-        for item in sfx_dir.rglob("*"):
-            if item.is_file() and item.suffix.lower() in [".mp3", ".ogg", ".wav"]:
-                base = re.sub(r'_\d+$', '', item.stem).strip().lower()
-                if base:
-                    sfx_candidates.add(base)
+        layer = target_layer
+        if not layer:
+            # Detect layer from directory path name
+            parts = [p.lower() for p in f.parts]
+            if "bg" in parts or "ui" in parts:
+                layer = "bg"
+            elif "amb" in parts or "ambient" in parts:
+                layer = "amb"
+            elif "sfx" in parts or "meme" in parts:
+                layer = "sfx"
+            else:
+                # Heuristic guess based on name
+                if any(k in base for k in ["music", "theme", "melody", "piano", "orchestra", "sad", "epic", "acoustic", "fun"]):
+                    layer = "bg"
+                else:
+                    layer = "amb"
 
-    # If folder is empty or not yet populated, provide clean defaults
-    if len(bg_candidates) <= 1:
-        bg_candidates.update([
-            "legendary-kingdom-music-rising-empire", "fantasy-ambient", "magic_fantasy",
-            "ancient_celtic_music", "nto-the-darkness-cello-version-long",
-            "by-the-rafters-glow-full-version-medieval-tavern-music-rpg-game",
-            "desert_in_bloom", "magical-forest-instrumental-flute-strings-melody"
-        ])
-    if len(amb_candidates) <= 1:
-        amb_candidates.update([
-            "cave", "dungeon", "forest", "rain", "storm", "tavern",
-            "crowd", "fireplace", "military_camp", "snow_mountain", "ocean_beach",
-            "village", "barrack", "turkish_bazar", "birds_voices", "crows", "war_drums"
-        ])
-    if len(sfx_candidates) <= 1:
-        sfx_candidates.update([
-            "sword_clash", "heavy_strike", "magic_cast", "gallop", "run",
-            "monster_roar", "male_laugh", "meme_laugh", "scream", "heartbeat",
-            "page_turn", "neighing", "crows", "guns_battle"
-        ])
+        if layer == "bg":
+            bg_candidates.add(base)
+        elif layer == "amb":
+            amb_candidates.add(base)
+        elif layer == "sfx":
+            sfx_candidates.add(base)
+
+    # 1. Scan CORE (Universal pool for all settings)
+    core_dir = sounds_dir / "core"
+    if core_dir.exists():
+        for item in core_dir.rglob("*"):
+            _add_file(item)
+
+    # 2. Scan SPECIFIC PACK (or all active packs if no setting specified)
+    packs_dir = sounds_dir / "packs"
+    if packs_dir.exists():
+        if setting_pack and (packs_dir / setting_pack).exists():
+            for item in (packs_dir / setting_pack).rglob("*"):
+                _add_file(item)
+        else:
+            # If no setting pack specified or not found, scan all packs
+            for item in packs_dir.rglob("*"):
+                _add_file(item)
+
+    # 3. Scan MEME folder
+    meme_dir = sounds_dir / "meme"
+    if meme_dir.exists():
+        for item in meme_dir.rglob("*"):
+            _add_file(item, target_layer="sfx")
+
+    # 4. Scan MY_SOUNDS & legacy folders for backward compatibility
+    for legacy_name in ["ambient", "sfx", "ui", "my_sounds"]:
+        legacy_dir = sounds_dir / legacy_name
+        if legacy_dir.exists():
+            for item in legacy_dir.rglob("*"):
+                _add_file(item)
 
     return sorted(list(bg_candidates)), sorted(list(amb_candidates)), sorted(list(sfx_candidates))
 
@@ -129,7 +150,8 @@ class AISoundAnalyzer:
         self,
         chapter_dir: Path,
         pdf_path: Optional[Path] = None,
-        force_reanalyze: bool = False
+        force_reanalyze: bool = False,
+        title_profile: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieves cached timeline from chapter folder if available.
@@ -179,9 +201,18 @@ class AISoundAnalyzer:
             self._save_cache(cache_file, default_timeline)
             return default_timeline
 
+        # Auto-detect title profile if not provided
+        if not title_profile:
+            try:
+                from .title_classifier import TitleClassifier
+                classifier = TitleClassifier(self.api_key)
+                title_profile = classifier.get_title_profile(chapter_dir.parent.name)
+            except Exception:
+                pass
+
         # 4. Perform AI Analysis
         try:
-            timeline = self._analyze_pdf_with_gemini(target_pdf)
+            timeline = self._analyze_pdf_with_gemini(target_pdf, title_profile=title_profile)
             if timeline:
                 self._save_cache(cache_file, timeline)
                 return timeline
@@ -192,10 +223,11 @@ class AISoundAnalyzer:
         self._save_cache(cache_file, default_timeline)
         return default_timeline
 
-    def _analyze_pdf_with_gemini(self, pdf_path: Path) -> List[Dict[str, Any]]:
+    def _analyze_pdf_with_gemini(self, pdf_path: Path, title_profile: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Uploads chapter PDF using Google Files API (reliable, fast, no base64 size limits)
         and sends structured prompt to gemini-3.1-flash-lite.
+        Takes setting rules and forbidden audio elements into account.
         """
         file_size = pdf_path.stat().st_size
         logger.info(f"Uploading PDF {pdf_path.name} ({file_size / (1024*1024):.1f} MB) via Google Files API...")
@@ -220,13 +252,29 @@ class AISoundAnalyzer:
         if not file_uri:
             raise RuntimeError("Files API returned no file URI.")
 
-        # Scan distinct 3-layer pools
-        bg_pool, amb_pool, sfx_pool = scan_layered_sound_pools(self.sounds_dir)
+        # Build setting instructions if profile is available
+        setting_context = ""
+        setting_pack = None
+        if title_profile:
+            setting_pack = title_profile.get("setting_pack", "medieval_fantasy")
+            primary_genre = title_profile.get("primary_genre", "Fantasy")
+            era = title_profile.get("era", "Unknown")
+            forbidden = title_profile.get("forbidden_elements", [])
+            setting_context = f"""
+STRICT WORLD SETTING RULES:
+- Genre / Universe: {primary_genre} ({era})
+- Setting Pack: {setting_pack}
+- FORBIDDEN AUDIO ELEMENTS: {json.dumps(forbidden)}
+  NEVER trigger any sound that belongs to modern or anachronistic times! Respect the world's era strictly.
+"""
+
+        # Scan distinct 3-layer pools filtered by setting_pack + core + meme
+        bg_pool, amb_pool, sfx_pool = scan_layered_sound_pools(self.sounds_dir, setting_pack=setting_pack)
 
         prompt = f"""
 You are an award-winning anime and webtoon sound director, Foley master, and musical composer.
 Analyze this entire manhwa chapter PDF and compose a rich, multi-layered cinematic soundscape.
-
+{setting_context}
 CRITICAL ARCHITECTURE: 3 SIMULTANEOUS SOUND LAYERS
 A great soundtrack is a blend of 3 distinct elements playing together in harmony:
 

@@ -1,0 +1,48 @@
+{
+  "Revenge of the Iron-Blooded Sword Hound": {
+    "setting_pack": "medieval_fantasy",
+    "primary_genre": "Dark Medieval Fantasy",
+    "era": "Medieval European",
+    "forbidden_elements": [
+      "cars",
+      "cellphones",
+      "modern_sirens",
+      "electronic_beeps",
+      "automatic_rifles",
+      "synthesizers",
+      "electric_guitars"
+    ],
+    "recommended_instruments": [
+      "cello",
+      "orchestral_strings",
+      "war_drums",
+      "duduk",
+      "harpsichord"
+    ],
+    "summary": "A betrayed warrior regresses to his infancy within a brutal, sword-centric clan, vowing to exact vengeance against his former master.",
+    "verified": true,
+    "classified_at": "2026-10-18 13:11:02"
+  },
+  "Стал сторонником злодеев [RU]": {
+    "setting_pack": "medieval_fantasy",
+    "primary_genre": "Dark Medieval Fantasy",
+    "era": "Medieval European",
+    "forbidden_elements": [
+      "cars",
+      "cellphones",
+      "modern_sirens",
+      "electronic_beeps",
+      "automatic_rifles",
+      "synthesizers"
+    ],
+    "recommended_instruments": [
+      "cello",
+      "orchestral_strings",
+      "church_organ",
+      "percussion_drums"
+    ],
+    "summary": "A man reincarnated into a noble's body in a dark RPG world attempts to prevent the catastrophic rise of five great evils by manipulating the plot from the shadows.",
+    "verified": true,
+    "classified_at": "2026-10-18 15:03:15"
+  }
+}
